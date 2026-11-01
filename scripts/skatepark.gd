@@ -1,9 +1,13 @@
 class_name Skatepark
 extends Node3D
-## Skatepark con la distribución del street course de los X Games (ver moodboard):
-## deck elevado al oeste con escalera y barandillas, plaza norte con bank, barandilla
-## y flat rail, quarter grande al este, isla central con banks y wedge-ledge, bank
-## largo al sur, quarter en la esquina suroeste y flat rail y ledge en el centro.
+## Recorrido lineal de oeste a este que baja DECK_H en total:
+##  - Oeste: roll-in de salida y deck alto (aquí llegará la carretera).
+##  - Tres carriles bajando del deck: 1 (norte) gap con launcher y rampa de caída,
+##    2 (centro) un set de 15 escalones con hubba a cada lado y barandilla en medio,
+##    3 (sur) bank de bajada, kicker y container con un cono encima.
+##  - Este: quarters alineados con los carriles 1 y 3 para hacer el recorrido a la
+##    inversa; en el centro, olas y una rampa enorme que te sacan del mapa por una abertura
+##    del murete: al salir vuelves al principio sin perder velocidad (EXIT_X).
 ## Al aire libre y en estilo low-poly minimalista (caras planas, paleta cálida de
 ## atardecer); el entorno está en Scenery.
 ##
@@ -14,7 +18,38 @@ extends Node3D
 const HALF_X := 28.0
 const HALF_Z := 17.0
 ## Techo para la cámara (el park está al aire libre).
-const WALL_H := 12.0
+const WALL_H := 16.0
+## Altura del deck de salida sobre el fondo del park (un set de 15 escalones de 16 cm).
+const DECK_H := 2.4
+## Altura del roll-in de salida sobre el deck (da la velocidad para los saltos).
+const ROLL_IN_H := 4.5
+## x donde acaba el deck de los carriles 1 y 3 (la escalera empieza en -13).
+const LANE_START := -10.0
+## Carril 1: césped entre el labio de la lanzadera y la rampa de recepción.
+const GAP_LENGTH := 6.0
+## Curva de lanzadera de los banks (1 = recto). Las de recepción del gap, más marcada.
+const BANK_KICK := 1.3
+const GAP_KICK := 1.8
+## Carril 2: altura de las hubbas y de la barandilla sobre la línea de los escalones.
+const HUBBA_H := 0.9
+const RAIL_H := 1.1
+## Carril 3: distancia del final del ledge al contenedor de basura.
+const BIN_GAP := 3.5
+## Rampa final del centro: largo y altura del canto (que acaba junto a la abertura).
+const BIG_RAMP_L := 9.0
+const BIG_RAMP_H := 4.0
+## Olas del centro, justo antes de la rampa final. Largas para que con esta altura
+## las pendientes no pasen de ~40°.
+const WAVE_L := 18.0
+const WAVE_H := 2.4
+const WAVE_N := 2
+## Carriles (z): 1 al norte, 2 en el centro, 3 al sur.
+const LANE_Z := [-11.25, 0.0, 11.25]
+const LANE_EDGE := 5.5
+## Abertura del murete este por la que se sale del mapa (media anchura en z).
+const EXIT_HALF_W := 4.5
+## Al pasar de aquí en x se vuelve al principio del recorrido.
+const EXIT_X := HALF_X + 1.5
 ## Altura "infinita" fuera del park: el murete perimetral funciona como pared.
 const OUT_H := 50.0
 const NONE := Vector3(-1.0, 0.0, 0.0)
@@ -31,6 +66,10 @@ const C_CORAL := Color(0.86, 0.32, 0.28)
 const C_METAL := Color(0.72, 0.7, 0.76)
 const C_STEP := Color(0.68, 0.58, 0.56)
 const C_NAVY := Color(0.22, 0.2, 0.32)
+const C_GRASS := Color(0.56, 0.6, 0.3)
+const C_BUSH := Color(0.36, 0.52, 0.3)
+const C_CONTAINER := Color(0.2, 0.38, 0.3)
+const C_CONE := Color(1.0, 0.45, 0.15)
 
 const PAINTED := preload("res://shaders/painted.gdshader")
 
@@ -38,8 +77,14 @@ var shapes: Array[Dictionary] = []
 ## Zonas grindables: {a: Vector3, b: Vector3, kind: "rail" | "ledge" | "coping"}.
 ## a y b son la línea sobre la que se apoya la tabla.
 var rails: Array[Dictionary] = []
-var spawn_pos := Vector3(-9.0, 0.0, 0.5)
+## Salida: arriba del roll-in, mirando al este (+x).
+var spawn_pos := Vector3(-27.2, 0.0, 0.0)
 var spawn_yaw := -PI * 0.5
+## Decoración con malla propia (container, cono, matorrales y césped del gap).
+var _containers: Array[Dictionary] = []
+var _cones: Array[Vector3] = []
+var _bushes: Array[Vector3] = []
+var _grass: Array[Dictionary] = []
 ## Módulos colocados a mano en scenes/main.tscn (ver scripts/modules/park_module.gd).
 ## Hay que asignarlos antes de añadir el park al árbol.
 var modules: Array[ParkModule] = []
@@ -57,7 +102,8 @@ func _ready() -> void:
 ## Altura del suelo y su gradiente en (x, z): Vector3(h, dh/dx, dh/dz).
 func sample(x: float, z: float) -> Vector3:
 	if absf(x) > HALF_X or absf(z) > HALF_Z:
-		return Vector3(OUT_H, 0.0, 0.0)
+		if not in_exit(x, z):
+			return Vector3(OUT_H, 0.0, 0.0)
 	var best := Vector3.ZERO
 	for s in shapes:
 		var r := _sample_shape(s, x, z)
@@ -68,6 +114,40 @@ func sample(x: float, z: float) -> Vector3:
 
 func height_at(x: float, z: float) -> float:
 	return sample(x, z).x
+
+
+## Altura de un bank en u. k = 1 es recto; k > 1 curva hacia arriba al final como una
+## lanzadera (más empinado arriba, suave abajo).
+static func bank_height(bh: float, bl: float, k: float, u: float) -> float:
+	return bh * pow(clampf(u / bl, 0.0, 1.0), k)
+
+
+## Tipo de la superficie más alta en (x, z) ("qp", "wave", "bank"...; "" si es suelo).
+func kind_at(x: float, z: float) -> String:
+	var best := 0.0
+	var kind := ""
+	for s in shapes:
+		var r := _sample_shape(s, x, z)
+		if r.x > best:
+			best = r.x
+			kind = s["type"]
+	return kind
+
+
+## Quarters, olas y rampas: ahí el skater hace pump al bajar (ver Skater.PUMP_ACCEL).
+func is_pump_zone(x: float, z: float) -> bool:
+	var kind := kind_at(x, z)
+	return kind == "qp" or kind == "wave" or kind == "bank"
+
+
+## Rampa final del centro: subiéndola no se frena y empuja (ver Skater.BOOST_SPEED).
+func is_booster(x: float, z: float) -> bool:
+	return x > HALF_X - 0.1 - BIG_RAMP_L and x <= HALF_X and absf(z) < EXIT_HALF_W
+
+
+## Pasillo de salida tras la abertura del murete este (suelo a 0 hasta EXIT_X y algo más).
+func in_exit(x: float, z: float) -> bool:
+	return x > HALF_X and x < EXIT_X + 6.0 and absf(z) < EXIT_HALF_W
 
 
 func _sample_shape(s: Dictionary, x: float, z: float) -> Vector3:
@@ -104,8 +184,9 @@ func _sample_shape(s: Dictionary, x: float, z: float) -> Vector3:
 			var bl: float = s["l"]
 			var bh: float = s["h"]
 			if u < bl:
-				h = bh * u / bl
-				du = bh / bl
+				var k: float = s.get("k", 1.0)
+				h = bank_height(bh, bl, k, u)
+				du = bh * k * pow(u / bl, k - 1.0) / bl
 			else:
 				h = bh
 		"stairs":
@@ -113,6 +194,12 @@ func _sample_shape(s: Dictionary, x: float, z: float) -> Vector3:
 			var sl: float = s["l"] / float(n)
 			var sh: float = s["h"]
 			h = minf(floorf(u / sl) + 1.0, float(n)) * sh / float(n)
+		"slope":
+			# Plano inclinado de h0 (u = 0) a h1 (u = len): hubbas.
+			var h0: float = s["h0"]
+			var h1: float = s["h1"]
+			h = lerpf(h0, h1, u / length)
+			du = (h1 - h0) / length
 		"wave":
 			# Crestas de coseno entre dos tramos planos (ParkWave).
 			var flat: float = s["flat"]
@@ -123,56 +210,110 @@ func _sample_shape(s: Dictionary, x: float, z: float) -> Vector3:
 				var ch: float = s["h"]
 				h = ch * 0.5 * (1.0 - cos(k * t))
 				du = ch * 0.5 * k * sin(k * t)
-	return Vector3(h, du * d.x, du * d.y)
+	# y0: altura de la base (piezas encima del deck o de un rellano)
+	return Vector3(h + float(s.get("y0", 0.0)), du * d.x, du * d.y)
 
 
 # ---------------------------------------------------------------- distribución
 
 func _define_layout() -> void:
-	# Oeste: deck elevado en todo el extremo, con escalera de 6 y dos barandillas hacia
-	# el sur, bank de subida por el este y canto grindable donde cae a pelo.
-	_box(Vector2(-28.0, -17.0), Vector2(-19.0, 4.0), 1.3, C_CONCRETE, C_CONCRETE_DARK, true)
-	_stairs(Vector2(-23.5, 7.5), Vector2(0, -1), 5.0, 1.3, 3.5, 6)
-	for x in [-25.4, -21.6]:
-		_rail(Vector3(x, 1.94, 3.7), Vector3(x, 0.36, 7.8), "rail")
-	_bank(Vector2(-14.0, -10.0), Vector2(-1, 0), 10.0, 1.3, 5.0, 0.0, C_SLATE)
-	_rail(Vector3(-19.0, 1.3, -4.8), Vector3(-19.0, 1.3, 3.8), "ledge")
-	# Esquina suroeste: quarter pequeño mirando al este.
-	_qp(Vector2(-23.4, 12.5), Vector2(-1, 0), 9.0, 1.8, 1.4, C_CORAL)
+	var z1: float = LANE_Z[0]
+	var z3: float = LANE_Z[2]
+	var e := LANE_EDGE
 
-	# Norte: plaza elevada con bank hacia el centro, barandilla bajando por el bank,
-	# flat rail arriba, ledge al fondo y una jardinera en el canto.
-	_box(Vector2(-12.0, -17.0), Vector2(8.0, -9.0), 0.9, C_CONCRETE, C_CONCRETE_DARK, true)
-	_bank(Vector2(-2.0, -5.0), Vector2(0, -1), 20.0, 0.9, 4.0, 0.0, C_WOOD_SIDE)
-	_rail(Vector3(3.0, 1.35, -9.1), Vector3(3.0, 0.45, -5.1), "rail")
-	_rail(Vector3(-8.0, 1.32, -13.0), Vector3(-1.0, 1.32, -13.0), "rail")
-	_ledge_box(Vector2(4.0, -15.0), Vector2(8.0, -14.4), 1.4, C_MAUVE)
-	_box(Vector2(5.9, -10.8), Vector2(7.1, -9.6), 1.4, C_OCHRE, C_CORAL, true)
+	# Oeste: roll-in de salida a lo ancho de todo el park (para elegir carril bajando)
+	# y deck alto. La escalera empieza en x = -13; los carriles 1 y 3, en LANE_START,
+	# un poco más tarde, para que dé tiempo a colocarse.
+	_box(Vector2(-28.0, -17.0), Vector2(-13.0, 17.0), DECK_H, C_CONCRETE, C_CONCRETE_DARK, true)
+	_box(Vector2(-13.0, -17.0), Vector2(LANE_START, -e), DECK_H, C_CONCRETE, C_CONCRETE_DARK, true)
+	_box(Vector2(-13.0, e), Vector2(LANE_START, 17.0), DECK_H, C_CONCRETE, C_CONCRETE_DARK, true)
+	_bank(Vector2(-20.5, 0.0), Vector2(-1, 0), 34.0, ROLL_IN_H, 6.0, 1.5, C_WOOD_SIDE, DECK_H)
 
-	# Este: quarter grande a lo ancho de todo el extremo, con deck y coping.
-	_qp(Vector2(23.2, 0.0), Vector2(1, 0), 30.0, 2.4, 1.6, C_SLATE)
+	# Carril 1 (norte): lanzadera larga al borde del deck, hueco de césped a ras de suelo
+	# y rampa de recepción donde acaba el césped. Si te quedas corto caes al césped, que
+	# da al final de la escalera, y sales por ahí.
+	_add_module(_wedge(4.5, 1.0, 8.0), Vector3(LANE_START - 4.5, DECK_H, z1))
+	var land_top := LANE_START + GAP_LENGTH
+	_grass.append({"min": Vector2(LANE_START, -17.0), "max": Vector2(land_top, -e)})
+	# La recepción también es lanzadera (perfil curvo): al hacer el recorrido a la
+	# inversa te lanza por encima del césped hacia la lanzadera del deck.
+	_bank(Vector2(land_top + 8.5, z1), Vector2(-1, 0), 17.0 - e, 2.0, 8.0, 0.5, C_SLATE, 0.0, GAP_KICK)
+	for p in [Vector2(-8.6, -13.0), Vector2(-6.4, -9.5), Vector2(-7.6, -15.2), Vector2(-5.2, -12.0)]:
+		_bushes.append(Vector3(p.x, 0.0, p.y))
 
-	# Isla central-este (el óvalo de la referencia): funbox bajo con banks en los
-	# cuatro lados, wedge-ledge encima y una barra en el extremo.
-	_box(Vector2(10.0, -1.0), Vector2(17.0, 5.0), 0.7, C_WOOD, C_WOOD_SIDE)
-	_bank(Vector2(7.5, 2.0), Vector2(1, 0), 6.0, 0.7, 2.5, 0.0, C_WOOD_SIDE)
-	_bank(Vector2(19.5, 2.0), Vector2(-1, 0), 6.0, 0.7, 2.5, 0.0, C_WOOD_SIDE)
-	_bank(Vector2(13.5, -3.5), Vector2(0, 1), 7.0, 0.7, 2.5, 0.0, C_WOOD_SIDE)
-	_bank(Vector2(13.5, 7.5), Vector2(0, -1), 7.0, 0.7, 2.5, 0.0, C_WOOD_SIDE)
-	_ledge_box(Vector2(10.5, 1.6), Vector2(13.5, 2.4), 1.2, C_CONCRETE_DARK)
-	_rail(Vector3(15.6, 1.12, 0.6), Vector3(15.6, 1.12, 3.4), "rail")
+	# Carril 2 (centro): un set de 15 escalones (DECK_H) con hubba a cada lado y
+	# barandilla en medio.
+	var stair_w := 2.0 * e - 1.2
+	_stairs(Vector2(-8.5, 0.0), Vector2(-1, 0), stair_w, DECK_H, 4.5, 15)
+	# Altas para que al saltar desde el deck la tabla baje hasta ellas y enganche el grind.
+	for sz in [-1.0, 1.0]:
+		_hubba(Vector2(-13.0, sz * (e - 0.3)), 4.5, DECK_H + HUBBA_H, HUBBA_H)
+	_rail(Vector3(-12.8, DECK_H - 0.1 + RAIL_H, 0.0), Vector3(-8.7, 0.16 + RAIL_H, 0.0), "rail")
 
-	# Sur: bank largo y bajo a lo largo del lado sur, con deck arriba.
-	_bank(Vector2(0.0, 12.0), Vector2(0, 1), 28.0, 1.4, 4.0, 1.0, C_WOOD_SIDE)
-	_box(Vector2(-0.6, 9.9), Vector2(0.6, 11.1), 0.55, C_OCHRE, C_CORAL, true)
+	# Carril 3 (sur): bank de bajada del deck y ledge sobre arco que hace de lanzadera
+	# (se sube rodando o grindando) para saltar un contenedor de basura con un cono
+	# encima, a BIN_GAP del final del ledge: hace falta un buen ollie. Tocar el cono es
+	# caer; el contenedor se puede pisar.
+	_bank(Vector2(LANE_START + 7.0, z3), Vector2(-1, 0), 17.0 - e, DECK_H, 7.0, 0.0, C_WOOD_SIDE)
+	var ledge := ParkArchLedge.new()
+	ledge.length = 4.0
+	ledge.width = 1.6
+	ledge.high_end = 0.9
+	_add_module(ledge, Vector3(1.0, 0.0, z3))
+	var bin_x := 1.0 + ledge.length + BIN_GAP
+	_container(Vector2(bin_x, z3 - 1.0), Vector2(bin_x + 1.2, z3 + 1.0), 1.2)
+	_cone_on(Vector3(bin_x + 0.6, 1.2, z3))
 
-	# Suelo central: flat rail largo y ledge bajo (manual pad).
-	_rail(Vector3(-6.0, 0.42, 3.0), Vector3(2.0, 0.42, 3.0), "rail")
-	_ledge_box(Vector2(-10.0, 6.0), Vector2(-4.0, 7.0), 0.45, C_CONCRETE_DARK)
+	# Este: quarters al final de los carriles 1 y 3 para volver a la inversa.
+	_qp(Vector2(23.5, z1), Vector2(1, 0), 11.0, 2.6, 1.1, C_SLATE)
+	_qp(Vector2(23.5, z3), Vector2(1, 0), 11.0, 2.6, 1.1, C_SLATE)
+	# En el centro, olas y una rampa enorme que acaba en la abertura del murete y te
+	# lanza fuera del mapa (subirla no frena, ver is_booster).
+	var wave := ParkWave.new()
+	wave.length = WAVE_L
+	wave.crest_height = WAVE_H
+	wave.crests = WAVE_N
+	wave.width = 2.0 * EXIT_HALF_W
+	_add_module(wave, Vector3(HALF_X - 0.1 - BIG_RAMP_L - WAVE_L, 0.0, 0.0))
+	_add_module(_wedge(BIG_RAMP_L, BIG_RAMP_H, 2.0 * EXIT_HALF_W), Vector3(HALF_X - 0.1 - BIG_RAMP_L, 0.0, 0.0))
 
 	# Módulos colocados a mano en el editor (ParkModule): suman su física y rails.
 	for m in modules:
 		m.register(self)
+
+
+func _wedge(length: float, height: float, width: float) -> ParkWedge:
+	var w := ParkWedge.new()
+	w.length = length
+	w.height = height
+	w.width = width
+	return w
+
+
+## Añade un módulo del layout como hijo del park y registra su física.
+func _add_module(m: ParkModule, pos: Vector3) -> void:
+	m.position = pos
+	add_child(m)
+	m.register(self)
+
+
+## Hubba: ledge inclinado junto a una escalera, de h0 a h1 a lo largo de +x.
+func _hubba(start: Vector2, length: float, h0: float, h1: float) -> void:
+	shapes.append({"type": "slope", "o": start, "dir": Vector2(1, 0), "w": 0.6, "len": length,
+		"h0": h0, "h1": h1})
+	_rail(Vector3(start.x, h0, start.y), Vector3(start.x + length, h1, start.y), "ledge")
+
+
+func _container(mn: Vector2, mx: Vector2, h: float) -> void:
+	shapes.append({"type": "box", "min": mn, "max": mx, "h": h, "nomesh": true})
+	_containers.append({"min": mn, "max": mx, "h": h})
+
+
+## Cono sólido sobre una superficie: chocar con él es como chocar con una pared.
+func _cone_on(base: Vector3) -> void:
+	shapes.append({"type": "box", "min": Vector2(base.x - 0.2, base.z - 0.2),
+		"max": Vector2(base.x + 0.2, base.z + 0.2), "h": base.y + 0.7, "nomesh": true})
+	_cones.append(base)
 
 
 func _qp(origin: Vector2, dir: Vector2, width: float, height: float, deck: float, side: Color) -> void:
@@ -189,14 +330,14 @@ func _qp(origin: Vector2, dir: Vector2, width: float, height: float, deck: float
 	_rail(Vector3(c1.x, height + 0.02, c1.y), Vector3(c2.x, height + 0.02, c2.y), "coping")
 
 
-func _bank(origin: Vector2, dir: Vector2, width: float, height: float, length: float, deck: float, side: Color) -> void:
+func _bank(origin: Vector2, dir: Vector2, width: float, height: float, length: float, deck: float, side: Color, y0 := 0.0, kick := BANK_KICK) -> void:
 	shapes.append({"type": "bank", "o": origin, "dir": dir.normalized(), "w": width, "h": height,
-		"l": length, "len": length + deck, "side": side})
+		"l": length, "len": length + deck, "side": side, "y0": y0, "k": kick})
 
 
-func _stairs(origin: Vector2, dir: Vector2, width: float, height: float, length: float, steps: int) -> void:
+func _stairs(origin: Vector2, dir: Vector2, width: float, height: float, length: float, steps: int, y0 := 0.0) -> void:
 	shapes.append({"type": "stairs", "o": origin, "dir": dir.normalized(), "w": width, "h": height,
-		"l": length, "len": length, "n": steps})
+		"l": length, "len": length, "n": steps, "y0": y0})
 
 
 func _box(mn: Vector2, mx: Vector2, h: float, top: Color, side: Color, trim := false) -> void:
@@ -241,6 +382,19 @@ func _build_meshes() -> void:
 				_mesh_bank(s)
 			"stairs":
 				_mesh_stairs(s)
+			"slope":
+				_mesh_slope(s)
+	for c in _containers:
+		_mesh_container(c)
+	for c in _cones:
+		_mesh_cone(c)
+	for b in _bushes:
+		_mesh_bush(b)
+	for g in _grass:
+		var mn: Vector2 = g["min"]
+		var mx: Vector2 = g["max"]
+		_quad(Vector3(mn.x, 0.01, mn.y), Vector3(mx.x, 0.01, mn.y), Vector3(mx.x, 0.01, mx.y),
+			Vector3(mn.x, 0.01, mx.y), Vector3.UP, C_GRASS)
 	for r in rails:
 		if not r.get("nomesh", false):
 			_mesh_rail(r)
@@ -257,23 +411,33 @@ func _build_meshes() -> void:
 			z += slab
 		x += slab
 	_perimeter()
-	# Valla de madera al fondo de la plaza norte
-	for i in range(0, 11):
-		var fx := -12.0 + i * 2.0
-		_cuboid(Vector3(fx - 0.05, 0.9, -16.75), Vector3(fx + 0.05, 1.8, -16.65), C_WOOD_SIDE)
-	_cuboid(Vector3(-12.0, 1.65, -16.78), Vector3(8.0, 1.75, -16.62), C_WOOD)
-	_cuboid(Vector3(-12.0, 1.25, -16.78), Vector3(8.0, 1.32, -16.62), C_WOOD)
 	_finish("Park")
 
 
-## Murete de hormigón alrededor del park (es el límite físico).
+## Murete de hormigón alrededor del park (es el límite físico). Sigue la altura del
+## suelo de dentro (en el deck sobresale lo mismo) y deja la abertura de salida al este.
 func _perimeter() -> void:
-	var h := 0.7
 	var t := 0.35
-	_cuboid(Vector3(-HALF_X - t, 0.0, -HALF_Z - t), Vector3(HALF_X + t, h, -HALF_Z), C_CONCRETE_DARK)
-	_cuboid(Vector3(-HALF_X - t, 0.0, HALF_Z), Vector3(HALF_X + t, h, HALF_Z + t), C_CONCRETE_DARK)
-	_cuboid(Vector3(-HALF_X - t, 0.0, -HALF_Z), Vector3(-HALF_X, h, HALF_Z), C_CONCRETE_DARK)
-	_cuboid(Vector3(HALF_X, 0.0, -HALF_Z), Vector3(HALF_X + t, h, HALF_Z), C_CONCRETE_DARK)
+	var step := 1.0
+	var x := -HALF_X - t
+	while x < HALF_X + t - 0.01:
+		var x1 := minf(x + step, HALF_X + t)
+		var xm := clampf((x + x1) * 0.5, -HALF_X + 0.2, HALF_X - 0.2)
+		_cuboid(Vector3(x, 0.0, -HALF_Z - t), Vector3(x1, _wall_top(xm, -HALF_Z + 0.2), -HALF_Z), C_CONCRETE_DARK)
+		_cuboid(Vector3(x, 0.0, HALF_Z), Vector3(x1, _wall_top(xm, HALF_Z - 0.2), HALF_Z + t), C_CONCRETE_DARK)
+		x = x1
+	var z := -HALF_Z
+	while z < HALF_Z - 0.01:
+		var z1 := minf(z + step, HALF_Z)
+		var zm := (z + z1) * 0.5
+		_cuboid(Vector3(-HALF_X - t, 0.0, z), Vector3(-HALF_X, _wall_top(-HALF_X + 0.2, zm), z1), C_CONCRETE_DARK)
+		if absf(zm) > EXIT_HALF_W:
+			_cuboid(Vector3(HALF_X, 0.0, z), Vector3(HALF_X + t, _wall_top(HALF_X - 0.2, zm), z1), C_CONCRETE_DARK)
+		z = z1
+
+
+func _wall_top(x: float, z: float) -> float:
+	return height_at(x, z) + 0.7
 
 
 func _begin() -> void:
@@ -375,7 +539,7 @@ func _wall_band(a: Vector3, b: Vector3, y0: float, y1: float, n: Vector3, col: C
 func _lp(s: Dictionary, u: float, v: float, y: float) -> Vector3:
 	var o: Vector2 = s["o"]
 	var d: Vector2 = s["dir"]
-	return Vector3(o.x + u * d.x - v * d.y, y, o.y + u * d.y + v * d.x)
+	return Vector3(o.x + u * d.x - v * d.y, y + float(s.get("y0", 0.0)), o.y + u * d.y + v * d.x)
 
 
 func _ld(s: Dictionary, u: float, v: float, y: float) -> Vector3:
@@ -446,19 +610,32 @@ func _mesh_bank(s: Dictionary) -> void:
 	var bl: float = s["l"]
 	var length: float = s["len"]
 	var side: Color = s["side"]
+	var k: float = s.get("k", 1.0)
 	var hw := w * 0.5
-	var g := _ld(s, h / bl, 0.0, 0.0) * (h / bl)
-	var n := Vector3(-g.x, 1.0, -g.z).normalized()
 	var surf := C_CORAL.lightened(0.15) if side == C_CORAL else C_WOOD
-	_quad(_lp(s, 0.0, -hw, 0.0), _lp(s, bl, -hw, h), _lp(s, bl, hw, h), _lp(s, 0.0, hw, 0.0), n, surf)
 	var right := _ld(s, 0.0, 1.0, 0.0)
 	var fwd := _ld(s, 1.0, 0.0, 0.0)
+	# Pocas caras para que se vean las facetas de la curva de lanzadera
+	var seg := 1 if is_equal_approx(k, 1.0) else 8
+	for i in seg:
+		var u0 := bl * float(i) / seg
+		var u1 := bl * float(i + 1) / seg
+		var y0 := bank_height(h, bl, k, u0)
+		var y1 := bank_height(h, bl, k, u1)
+		var a := _lp(s, u0, -hw, y0)
+		var b := _lp(s, u1, -hw, y1)
+		var d := _lp(s, u0, hw, y0)
+		var n := (b - a).cross(d - a).normalized()
+		if n.y < 0.0:
+			n = -n
+		_quad(a, b, _lp(s, u1, hw, y1), d, n, surf)
+		for sv in [-1.0, 1.0]:
+			_quad(_lp(s, u0, hw * sv, 0.0), _lp(s, u1, hw * sv, 0.0), _lp(s, u1, hw * sv, y1),
+				_lp(s, u0, hw * sv, y0), right * sv, side)
 	for sv in [-1.0, 1.0]:
 		var sn: Vector3 = right * sv
-		var p0 := _lp(s, 0.0, hw * sv, 0.0)
 		var p1 := _lp(s, bl, hw * sv, 0.0)
 		var p2 := _lp(s, bl, hw * sv, h)
-		_tri(p0, p1, p2, sn, side)
 		if length > bl:
 			_quad(p1, _lp(s, length, hw * sv, 0.0), _lp(s, length, hw * sv, h), p2, sn, side)
 	if length > bl:
@@ -485,6 +662,84 @@ func _mesh_stairs(s: Dictionary) -> void:
 		_quad(_lp(s, u0, -hw, y0), _lp(s, u0, hw, y0), _lp(s, u0, hw, y1), _lp(s, u0, -hw, y1), -fwd, C_CONCRETE_DARK)
 		for sv in [-1.0, 1.0]:
 			_quad(_lp(s, u0, hw * sv, 0.0), _lp(s, u1, hw * sv, 0.0), _lp(s, u1, hw * sv, y1), _lp(s, u0, hw * sv, y1), right * sv, C_CONCRETE_DARK)
+
+
+## Hubba: bloque con la cara de arriba inclinada y paredes hasta el suelo.
+func _mesh_slope(s: Dictionary) -> void:
+	var w: float = s["w"]
+	var length: float = s["len"]
+	var h0: float = s["h0"]
+	var h1: float = s["h1"]
+	var hw := w * 0.5
+	var right := _ld(s, 0.0, 1.0, 0.0)
+	var fwd := _ld(s, 1.0, 0.0, 0.0)
+	var n := (_lp(s, length, -hw, h1) - _lp(s, 0.0, -hw, h0)).cross(right).normalized()
+	if n.y < 0.0:
+		n = -n
+	_quad(_lp(s, 0.0, -hw, h0), _lp(s, length, -hw, h1), _lp(s, length, hw, h1), _lp(s, 0.0, hw, h0), n, C_CONCRETE)
+	for sv in [-1.0, 1.0]:
+		_quad(_lp(s, 0.0, hw * sv, 0.0), _lp(s, length, hw * sv, 0.0), _lp(s, length, hw * sv, h1),
+			_lp(s, 0.0, hw * sv, h0), right * sv, C_CONCRETE_DARK)
+		# canto metálico a lo largo de la arista superior
+		var mv: float = (hw + 0.01) * sv
+		_quad(_lp(s, 0.0, mv, h0 - 0.05), _lp(s, length, mv, h1 - 0.05), _lp(s, length, mv, h1),
+			_lp(s, 0.0, mv, h0), right * sv, C_METAL)
+	_quad(_lp(s, 0.0, -hw, 0.0), _lp(s, 0.0, hw, 0.0), _lp(s, 0.0, hw, h0), _lp(s, 0.0, -hw, h0), -fwd, C_CONCRETE_DARK)
+	_quad(_lp(s, length, -hw, 0.0), _lp(s, length, hw, 0.0), _lp(s, length, hw, h1), _lp(s, length, -hw, h1), fwd, C_CONCRETE_DARK)
+
+
+## Container de obra: caja verde con nervios verticales en los lados.
+func _mesh_container(c: Dictionary) -> void:
+	var mn: Vector2 = c["min"]
+	var mx: Vector2 = c["max"]
+	var h: float = c["h"]
+	_cuboid(Vector3(mn.x, 0.0, mn.y), Vector3(mx.x, h, mx.y), C_CONTAINER)
+	var rib := C_CONTAINER.darkened(0.25)
+	var z := mn.y + 0.3
+	while z < mx.y - 0.2:
+		_cuboid(Vector3(mn.x - 0.03, 0.05, z), Vector3(mn.x, h - 0.05, z + 0.12), rib)
+		_cuboid(Vector3(mx.x, 0.05, z), Vector3(mx.x + 0.03, h - 0.05, z + 0.12), rib)
+		z += 0.5
+	_cuboid(Vector3(mn.x - 0.04, h - 0.1, mn.y - 0.04), Vector3(mx.x + 0.04, h, mx.y + 0.04), rib)
+
+
+## Cono de tráfico (6 caras) con banda blanca.
+func _mesh_cone(base: Vector3) -> void:
+	_cuboid(base + Vector3(-0.22, 0.0, -0.22), base + Vector3(0.22, 0.04, 0.22), C_CONE.darkened(0.2))
+	var sides := 6
+	# [altura inicial, altura final, color]; el radio se estrecha hacia arriba
+	var bands := [[0.04, 0.3, C_CONE], [0.3, 0.42, Color(0.95, 0.93, 0.9)], [0.42, 0.7, C_CONE]]
+	for b in bands:
+		var y0: float = b[0]
+		var y1: float = b[1]
+		var r0: float = 0.17 - (y0 - 0.04) * 0.22
+		var r1: float = 0.17 - (y1 - 0.04) * 0.22
+		var col: Color = b[2]
+		for i in sides:
+			var a0 := TAU * i / sides
+			var a1 := TAU * (i + 1) / sides
+			var p0 := base + Vector3(cos(a0) * r0, y0, sin(a0) * r0)
+			var p1 := base + Vector3(cos(a1) * r0, y0, sin(a1) * r0)
+			var p2 := base + Vector3(cos(a1) * r1, y1, sin(a1) * r1)
+			var p3 := base + Vector3(cos(a0) * r1, y1, sin(a0) * r1)
+			var n := Vector3(cos((a0 + a1) * 0.5), 0.3, sin((a0 + a1) * 0.5)).normalized()
+			_quad(p0, p1, p2, p3, n, col)
+
+
+## Matorral low-poly (octaedro aplastado), sin física.
+func _mesh_bush(c: Vector3) -> void:
+	var r := 0.7 + _hash2(c.x, c.z) * 0.4
+	var top := c + Vector3(0, r * 1.1, 0)
+	var ring: Array[Vector3] = []
+	for i in 5:
+		var a := TAU * i / 5.0 + c.x
+		ring.append(c + Vector3(cos(a) * r, r * 0.35, sin(a) * r))
+	for i in 5:
+		var p0 := ring[i]
+		var p1 := ring[(i + 1) % 5]
+		var mid := (p0 + p1) * 0.5
+		_tri(top, p0, p1, ((mid - c).normalized() + Vector3.UP * 0.6).normalized(), C_BUSH)
+		_tri(c, p0, p1, ((mid - c).normalized() - Vector3.UP * 0.2).normalized(), C_BUSH.darkened(0.2))
 
 
 func _mesh_rail(r: Dictionary) -> void:

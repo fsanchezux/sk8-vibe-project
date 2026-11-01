@@ -112,35 +112,32 @@ func _place_decals() -> void:
 	if _tags.is_empty():
 		return
 	var up := Vector3.UP
-	var deck_bank_n := Vector3(0.26, 1.0, 0.0).normalized()
-	var plaza_bank_n := Vector3(0.0, 1.0, 0.23).normalized()
-	var south_bank_n := Vector3(0.0, 1.0, -0.35).normalized()
+	# Normales de las rampas que bajan hacia el este (pendiente = altura / largo)
+	var gap_land_n := Vector3(2.0 / 8.0, 1.0, 0.0).normalized()
+	var drop_bank_n := Vector3(Skatepark.DECK_H / 7.0, 1.0, 0.0).normalized()
+	var box_land_n := Vector3(1.2 / 5.0, 1.0, 0.0).normalized()
 	var qp_n := Vector3(-0.59, 1.0, 0.0).normalized()
+	var z1: float = Skatepark.LANE_Z[0]
+	var z3: float = Skatepark.LANE_Z[2]
+	var dh := Skatepark.DECK_H
 	var spots := [
 		# [centro, normal, ancho, alto]
-		[Vector3(-20.0, 0.65, 4.0), Vector3.BACK, 1.6, 1.0],
-		[Vector3(-19.0, 0.65, 0.0), Vector3.RIGHT, 2.6, 1.1],
-		[Vector3(-16.5, 0.65, -10.0), deck_bank_n, 3.0, 1.5],
-		[Vector3(-7.0, 0.45, -7.0), plaza_bank_n, 3.0, 1.5],
-		[Vector3(7.0, 0.45, -7.0), plaza_bank_n, 2.4, 1.2],
-		[Vector3(25.2, 0.6, -8.0), qp_n, 2.6, 1.3],
-		[Vector3(25.2, 0.6, 8.0), qp_n, 2.6, 1.3],
-		[Vector3(-7.0, 0.7, 14.0), south_bank_n, 3.0, 1.5],
-		[Vector3(7.0, 0.7, 14.0), south_bank_n, 3.0, 1.5],
-		[Vector3(12.0, 0.95, 1.6), Vector3.FORWARD, 2.0, 0.5],
-		[Vector3(-7.0, 0.22, 6.0), Vector3.FORWARD, 2.2, 0.4],
-		[Vector3(-7.0, 0.22, 7.0), Vector3.BACK, 2.2, 0.4],
-		[Vector3(6.0, 1.15, -14.4), Vector3.BACK, 2.0, 0.5],
-		[Vector3(-18.0, 0.35, 17.0), Vector3.FORWARD, 2.0, 0.7],
-		[Vector3(18.0, 0.35, 17.0), Vector3.FORWARD, 2.0, 0.7],
-		[Vector3(15.0, 0.35, -17.0), Vector3.BACK, 2.0, 0.7],
-		[Vector3(-14.0, 0.0, 2.0), up, 2.4, 1.2],
-		[Vector3(19.0, 0.0, -8.0), up, 2.4, 1.2],
-		[Vector3(15.5, 0.7, 0.0), up, 1.6, 1.0],
+		[Vector3(Skatepark.LANE_START + 0.02, 1.2, z1 + 2.5), Vector3.RIGHT, 2.4, 1.0],
+		[Vector3(0.0, 1.12, z1), gap_land_n, 3.0, 1.5],
+		[Vector3(-6.5, 1.2, z3), drop_bank_n, 3.0, 1.5],
+		[Vector3(14.0, 0.5, z3), box_land_n, 2.4, 1.2],
+		[Vector3(25.2, 0.6, z1), qp_n, 2.6, 1.3],
+		[Vector3(25.2, 0.6, z3), qp_n, 2.6, 1.3],
+		[Vector3(8.48, 0.6, z3), Vector3.LEFT, 1.6, 0.8],
+				[Vector3(12.0, 0.35, 16.99), Vector3.FORWARD, 2.0, 0.7],
+		[Vector3(12.0, 0.35, -16.99), Vector3.BACK, 2.0, 0.7],
+		[Vector3(-17.0, dh, 8.0), up, 2.4, 1.2],
+		[Vector3(-17.0, dh, -8.0), up, 2.4, 1.2],
+		[Vector3(14.0, 0.0, -9.0), up, 2.4, 1.2],
+		[Vector3(-7.2, 0.0, 0.0), up, 1.6, 1.0],
 		# mobiliario
-		[Vector3(-17.5, 0.55, 13.97), Vector3.FORWARD, 1.6, 0.8],
-		[Vector3(20.0, 0.55, 13.97), Vector3.FORWARD, 1.6, 0.8],
-		[Vector3(21.0, 0.5, -15.15), Vector3.BACK, 0.55, 0.45],
+		[Vector3(-19.0, dh + 0.55, 15.27), Vector3.FORWARD, 1.6, 0.8],
+		[Vector3(21.5, 0.5, -15.85), Vector3.BACK, 0.55, 0.45],
 	]
 	for i in spots.size():
 		var s: Array = spots[i]
@@ -169,14 +166,14 @@ func _decal(center: Vector3, n: Vector3, width: float, height: float, tex: Textu
 func _build_props() -> void:
 	_st = SurfaceTool.new()
 	_st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_dumpster(Vector3(-17.5, 0.0, 14.5), 0.0)
-	_dumpster(Vector3(20.0, 0.0, 14.5), 0.0)
-	_bin(Vector3(21.0, 0.0, -15.5))
-	_bin(Vector3(21.8, 0.0, -15.4))
-	for p in [Vector3(-2.0, 0, 9.0), Vector3(-1.3, 0, 9.5), Vector3(20.5, 0, 8.5), Vector3(-12.0, 0, 10.0)]:
+	var dh := Skatepark.DECK_H
+	_dumpster(Vector3(-19.0, dh, 15.8), 0.0)
+	_bin(Vector3(21.5, 0.0, -16.2))
+	_bin(Vector3(22.3, 0.0, -16.1))
+	for p in [Vector3(7.0, 0, 5.0), Vector3(12.0, 0, -5.0), Vector3(17.0, 0, 5.0), Vector3(-12.0, dh, -6.0)]:
 		_cone(p)
-	_sign(Vector3(22.5, 0.0, -16.3))
-	_sign(Vector3(-14.8, 0.0, 16.3))
+	_sign(Vector3(22.8, 0.0, 16.4))
+	_sign(Vector3(-14.0, dh, 16.4))
 	var mi := MeshInstance3D.new()
 	mi.mesh = _st.commit()
 	mi.material_override = Skatepark.lowpoly_material()
@@ -199,7 +196,7 @@ func _dumpster(c: Vector3, yaw: float) -> void:
 			_box_tapered(c + b * Vector3(sx * w * 0.38, -0.0, sz * d * 0.32), b, Vector3(0.1, 0, 0.1), Vector3(0.1, 0.12, 0.1), C_DARK)
 	if park:
 		var half := (b * Vector3(w * 0.5, 0, d * 0.5)).abs()
-		park.add_solid(Vector2(c.x - half.x, c.z - half.z), Vector2(c.x + half.x, c.z + half.z), h)
+		park.add_solid(Vector2(c.x - half.x, c.z - half.z), Vector2(c.x + half.x, c.z + half.z), c.y + h)
 
 
 ## Cubo de basura con ruedas.
@@ -207,7 +204,7 @@ func _bin(c: Vector3) -> void:
 	_box_tapered(c, Basis(), Vector3(0.52, 0, 0.6), Vector3(0.6, 0.95, 0.7), C_BIN)
 	_box_tapered(c + Vector3(0, 0.95, 0), Basis(), Vector3(0.64, 0, 0.74), Vector3(0.64, 0.05, 0.74), C_BIN.darkened(0.25))
 	if park:
-		park.add_solid(Vector2(c.x - 0.32, c.z - 0.37), Vector2(c.x + 0.32, c.z + 0.37), 1.0)
+		park.add_solid(Vector2(c.x - 0.32, c.z - 0.37), Vector2(c.x + 0.32, c.z + 0.37), c.y + 1.0)
 
 
 func _cone(c: Vector3) -> void:

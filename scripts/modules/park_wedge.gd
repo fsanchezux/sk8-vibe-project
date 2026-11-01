@@ -60,6 +60,6 @@ func _build() -> void:
 func register(park: Object) -> void:
 	# Mismo suelo que un quarter pipe sin deck (el círculo acaba justo en el canto).
 	park.shapes.append({"type": "qp", "o": _origin(), "dir": _dir(), "w": width, "h": height,
-		"r": _radius(), "ulip": length, "len": length, "nomesh": true})
+		"r": _radius(), "ulip": length, "len": length, "y0": global_position.y, "nomesh": true})
 	park.rails.append({"a": _world(length, width * 0.5 - 0.15, height + 0.02),
 		"b": _world(length, -(width * 0.5 - 0.15), height + 0.02), "kind": "coping", "nomesh": true})

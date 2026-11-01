@@ -2,8 +2,8 @@
 class_name ParkArchLedge
 extends ParkModule
 ## Ledge inclinado sobre un arco: una barra ancha y plana que sube desde el suelo (u = 0)
-## hasta high_end (u = length), apoyada en un arco semicircular. La cara superior es
-## grindable en los dos sentidos. El arco es decorativo y no bloquea el paso.
+## hasta high_end (u = length), apoyada en un arco semicircular. La cara superior se
+## puede subir rodando (lanzadera desde el extremo alto) y grindar en los dos sentidos.
 
 const ARCH_SEGMENTS := 12
 
@@ -92,5 +92,9 @@ func _build() -> void:
 
 
 func register(park: Object) -> void:
+	# Cara superior pisable: se puede subir rodando y saltar desde el extremo alto
+	# (lanzadera) o grindarla.
+	park.shapes.append({"type": "slope", "o": _origin(), "dir": _dir(), "w": width, "len": length,
+		"h0": low_end, "h1": high_end, "y0": global_position.y, "nomesh": true})
 	park.rails.append({"a": _world(0.0, 0.0, low_end), "b": _world(length, 0.0, high_end),
 		"kind": "ledge", "nomesh": true})

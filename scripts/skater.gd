@@ -180,7 +180,16 @@ var _brake_k := 0.0
 var _prev_tail := Vector3.ZERO
 ## Fuerza del pop del truco en curso (0..1): más altura vale más puntos.
 var _pop_power := 1.0
+## Cuánto está agachado por el pump (0..1).
+var _pump_k := 0.0
 var skid_marks: SkidMarks
+
+## Pump en quarters, olas y rampas: aceleración extra bajando (× seno de la pendiente).
+const PUMP_ACCEL := 6.0
+
+## Rampa final (Skatepark.is_booster): velocidad a la que te empuja y con qué aceleración.
+const BOOST_SPEED := 14.0
+const BOOST_ACCEL := 18.0
 
 ## Fuerza del pop con el teclado manteniendo Mayús (sin Mayús es 1.0).
 const KB_SOFT_POWER := 0.3
@@ -230,6 +239,7 @@ func reset_skater(pos := Vector3.ZERO, yaw := 0.0) -> void:
 	_push_phase = -1.0
 	_push_queued = false
 	_crouch = 0.0
+	_pump_k = 0.0
 	_lean = 0.0
 	_trick = {}
 	_grab_id = ""
@@ -327,6 +337,15 @@ func _ride(delta: float, move: Vector2) -> void:
 	_ground_n = Vector3(-g.x, 1.0, -g.y).normalized()
 	var f := _surface_forward(heading, g)
 
+	# Pump en quarters, olas y rampas: se agacha al bajar por la transición y se estira al
+	# subir, y bajando gana algo de velocidad extra (como al bombear con las piernas).
+	var pump := 0.0
+	if park.is_pump_zone(position.x, position.z) and f.y < 0.0:
+		pump = clampf(-f.y * 2.0, 0.0, 1.0)
+		speed += PUMP_ACCEL * -f.y * delta
+	_pump_k = move_toward(_pump_k, pump, delta * 5.0)
+	_crouch = maxf(_crouch, _pump_k)
+
 	# Empujar (pulgar derecho). No se empuja agachado ni en rampas empinadas.
 	if _push_phase >= 0.0:
 		_push_phase += delta / push_time
@@ -365,8 +384,12 @@ func _ride(delta: float, move: Vector2) -> void:
 	_brake_k = move_toward(_brake_k, 1.0 if _braking else 0.0, delta * 6.0)
 	_remember_safe_spot(delta)
 
-	# Gravedad a lo largo de la pendiente + rodadura y aire
-	speed -= gravity * f.y * delta
+	# Gravedad a lo largo de la pendiente + rodadura y aire. En la rampa final subir no
+	# frena: empuja hasta BOOST_SPEED para lanzarte fuera del mapa.
+	if f.y > 0.0 and park.is_booster(position.x, position.z):
+		speed = move_toward(speed, maxf(speed, BOOST_SPEED), BOOST_ACCEL * delta)
+	else:
+		speed -= gravity * f.y * delta
 	speed = move_toward(speed, 0.0, (rolling_friction + air_drag * speed * speed) * delta)
 	speed = clampf(speed, -max_speed, max_speed)
 
@@ -1006,6 +1029,15 @@ func mark_spot(force := false) -> bool:
 func go_to_spot() -> void:
 	reset_skater(_spot_pos, _spot_yaw)
 	_fade = 0.0
+
+
+## Vuelve al principio del recorrido sin perder velocidad (al salir del mapa por el este).
+func teleport_to(pos: Vector3, yaw: float) -> void:
+	var keep := Vector2(vel.x, vel.z).length() if state == State.AIR else current_speed()
+	if state == State.BAIL:
+		keep = 0.0
+	reset_skater(pos, yaw)
+	speed = minf(keep, max_speed)
 
 
 func spot_position() -> Vector3:

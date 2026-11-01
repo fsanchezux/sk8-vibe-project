@@ -36,6 +36,33 @@ no la respeten no se aceptarán.
 - Mando: stick derecho = trucos (misma intensidad por recorrido que en táctil),
   Back/Select = fijar spot, Y = volver al spot.
 
+## El recorrido
+
+Empiezas arriba de un roll-in en el deck oeste y bajas hacia el este por uno de tres
+carriles (el park baja 2,4 m en total). Los carriles 1 y 3 empiezan 3 m más tarde que
+la escalera, para que dé tiempo a colocarse:
+
+1. **Norte, gap:** lanzadera larga al borde del deck, 6 m de césped y rampa de recepción,
+   que también es lanzadera para hacer el gap a la inversa.
+2. **Centro, escaleras:** un set de 15 escalones con hubba a cada lado (0,9 m sobre los
+   escalones) y barandilla en medio (1,1 m), altas para poder grindarlas al saltar del deck.
+3. **Sur, basura:** bank de bajada y un ledge sobre arco ancho (1,6 m) que hace de lanzadera (súbelo
+   rodando o grindando) para saltar un contenedor de basura con un cono encima, algo
+   lejos: hace falta un buen ollie. Tocar el cono es caer.
+
+Al fondo hay dos quarters, alineados con los carriles 1 y 3, para volver a hacer el
+recorrido a la inversa. En el centro, dos olas de 2,4 m pegadas a una rampa enorme (4 m)
+te sacan por la abertura del murete. Subirla no frena: te empuja y te lanza fuera
+aunque llegues despacio. Al salir del mapa vuelves al principio con la misma velocidad.
+
+En los quarters, las olas y las rampas el skater hace pump solo: se agacha al bajar,
+se estira al subir y gana velocidad (`PUMP_ACCEL` en `scripts/skater.gd`).
+
+Todas las rampas rectas tienen un poco de curva de lanzadera al final (más empinadas
+arriba); la de recepción del gap, más marcada (`BANK_KICK` y `GAP_KICK`).
+
+Más adelante, la salida será una carretera de bajada con curvas que llega al deck.
+
 ## Módulos del mapa
 
 Piezas sueltas que se colocan a mano en el editor de Godot (`scripts/modules/`):
@@ -48,7 +75,8 @@ Piezas sueltas que se colocan a mano en el editor de Godot (`scripts/modules/`):
 
 Para usarlos: abre `scenes/main.tscn`, selecciona el nodo `Modules` y añade un nodo
 `Node3D` con el script del módulo (o duplica uno de los de ejemplo). Muévelo en X/Z y
-rótalo solo en Y; deja Y = 0 y la escala en 1. Las medidas (largo, ancho, altura,
+rótalo solo en Y y deja la escala en 1. Y es la altura de la base: 0 en el fondo del
+park, o la del deck (2,4) si la pieza va encima. Las medidas (largo, ancho, altura,
 color...) se cambian en el Inspector, y la malla se actualiza en el editor.
 
 Cada módulo dibuja su malla y registra su física en el skatepark al arrancar

@@ -80,4 +80,4 @@ func _build() -> void:
 
 func register(park: Object) -> void:
 	park.shapes.append({"type": "wave", "o": _origin(), "dir": _dir(), "w": width, "len": length,
-		"h": crest_height, "n": crests, "flat": flat_end, "nomesh": true})
+		"h": crest_height, "n": crests, "flat": flat_end, "y0": global_position.y, "nomesh": true})

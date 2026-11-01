@@ -93,6 +93,12 @@ func _process(delta: float) -> void:
 	ui.set_time(time_left)
 	_update_slowmo(real_dt)
 
+	# Salir por la abertura del este: vuelta al principio con la misma velocidad.
+	if skater.position.x > Skatepark.EXIT_X:
+		skater.teleport_to(park.spawn_pos, park.spawn_yaw)
+		ui.touch.reset()
+		camera.snap()
+
 	# El combo se cierra al rodar un momento sin encadenar otro truco.
 	if combo.active() and _ground_t >= 0.0 and skater.state == Skater.State.RIDING:
 		_ground_t += delta

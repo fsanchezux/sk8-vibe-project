@@ -9,8 +9,9 @@ extends Node3D
 ## así lo que se ve es lo que se pisa.
 ##
 ## Reglas al colocarlos:
-##  - Mueve en X/Z y rota solo en Y. Deja Y en 0 y la escala en 1 (las medidas son
-##    parámetros del Inspector, no la escala).
+##  - Mueve en X/Z y rota solo en Y; la escala en 1 (las medidas son parámetros del
+##    Inspector, no la escala). Y es la altura de la base: 0 en el fondo del park, o la
+##    altura del deck o rellano sobre el que se apoya la pieza.
 ##  - El eje X local es la dirección de la pieza (u); el eje Z, el ancho.
 
 const PAINTED := preload("res://shaders/painted.gdshader")

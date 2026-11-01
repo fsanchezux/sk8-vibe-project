@@ -50,8 +50,8 @@ func _dof(distance: float, transition: float) -> CameraAttributesPractical:
 ## farolas y el park, y una deriva lateral muy lenta.
 func _title_shot(delta: float) -> void:
 	_orbit_angle += delta * 0.05
-	global_position = Vector3(-4.0 + sin(_orbit_angle) * 3.0, 3.3, -15.5)
-	look_at(Vector3(-1.0 + sin(_orbit_angle) * 1.5, 1.2, 16.0), Vector3.UP)
+	global_position = Vector3(-4.0 + sin(_orbit_angle) * 3.0, 7.0, -15.5)
+	look_at(Vector3(-1.0 + sin(_orbit_angle) * 1.5, 2.0, 16.0), Vector3.UP)
 	fov = 58.0
 	attributes = _menu_attr
 
