@@ -36,6 +36,26 @@ no la respeten no se aceptarán.
 - Mando: stick derecho = trucos (misma intensidad por recorrido que en táctil),
   Back/Select = fijar spot, Y = volver al spot.
 
+## Módulos del mapa
+
+Piezas sueltas que se colocan a mano en el editor de Godot (`scripts/modules/`):
+
+| Módulo | Qué es | Grind |
+|---|---|---|
+| `ParkWave` | Ola de hormigón de varias crestas (VAG-3) | no |
+| `ParkWedge` | Cuña curva de hormigón con canto vivo | canto trasero |
+| `ParkArchLedge` | Ledge inclinado sobre un arco | cara superior |
+
+Para usarlos: abre `scenes/main.tscn`, selecciona el nodo `Modules` y añade un nodo
+`Node3D` con el script del módulo (o duplica uno de los de ejemplo). Muévelo en X/Z y
+rótalo solo en Y; deja Y = 0 y la escala en 1. Las medidas (largo, ancho, altura,
+color...) se cambian en el Inspector, y la malla se actualiza en el editor.
+
+Cada módulo dibuja su malla y registra su física en el skatepark al arrancar
+(`register()`), así que lo que se ve es lo que se pisa. Para crear uno nuevo, hereda de
+`ParkModule` e implementa `_build()` y `register()`. Los módulos son nuevos y están
+sin probar en el editor: si algo sale raro de forma o de escala, abre un issue.
+
 ## Requisitos
 
 - [Godot 4.7](https://godotengine.org/download) (la versión indicada en `project.godot`).

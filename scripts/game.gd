@@ -37,6 +37,12 @@ func _ready() -> void:
 	_build_world()
 
 	park = Skatepark.new()
+	# Módulos colocados a mano en el nodo "Modules" de main.tscn
+	var modules_root := get_node_or_null("Modules")
+	if modules_root:
+		for m in modules_root.get_children():
+			if m is ParkModule:
+				park.modules.append(m)
 	add_child(park)
 	var props := StreetProps.new()
 	props.park = park

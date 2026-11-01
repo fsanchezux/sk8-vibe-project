@@ -1,10 +1,11 @@
 class_name Skatepark
 extends Node3D
-## Skatepark basado en el street course de Tampa (FSA-166, referencia de Adrien
-## Guigues en ArtStation): quarter pipes en los extremos, banco largo con plataforma,
-## funbox central con ledge, plataforma con escalera y barandillas, ledge largo,
-## manual pad, flat rail y kicker. Al aire libre y en estilo low-poly minimalista
-## (caras planas, paleta cálida de atardecer); el entorno está en Scenery.
+## Skatepark con la distribución del street course de los X Games (ver moodboard):
+## deck elevado al oeste con escalera y barandillas, plaza norte con bank, barandilla
+## y flat rail, quarter grande al este, isla central con banks y wedge-ledge, bank
+## largo al sur, quarter en la esquina suroeste y flat rail y ledge en el centro.
+## Al aire libre y en estilo low-poly minimalista (caras planas, paleta cálida de
+## atardecer); el entorno está en Scenery.
 ##
 ## Toda la geometría son primitivas analíticas (caja, quarter pipe, banco, escalera).
 ## La misma definición da la altura del suelo para la física del skater (sample)
@@ -37,8 +38,11 @@ var shapes: Array[Dictionary] = []
 ## Zonas grindables: {a: Vector3, b: Vector3, kind: "rail" | "ledge" | "coping"}.
 ## a y b son la línea sobre la que se apoya la tabla.
 var rails: Array[Dictionary] = []
-var spawn_pos := Vector3(-8.0, 0.0, -1.0)
+var spawn_pos := Vector3(-9.0, 0.0, 0.5)
 var spawn_yaw := -PI * 0.5
+## Módulos colocados a mano en scenes/main.tscn (ver scripts/modules/park_module.gd).
+## Hay que asignarlos antes de añadir el park al árbol.
+var modules: Array[ParkModule] = []
 
 var _st: SurfaceTool
 
@@ -109,46 +113,66 @@ func _sample_shape(s: Dictionary, x: float, z: float) -> Vector3:
 			var sl: float = s["l"] / float(n)
 			var sh: float = s["h"]
 			h = minf(floorf(u / sl) + 1.0, float(n)) * sh / float(n)
+		"wave":
+			# Crestas de coseno entre dos tramos planos (ParkWave).
+			var flat: float = s["flat"]
+			var t := u - flat
+			var lw := length - 2.0 * flat
+			if t > 0.0 and t < lw:
+				var k := TAU * float(s["n"]) / lw
+				var ch: float = s["h"]
+				h = ch * 0.5 * (1.0 - cos(k * t))
+				du = ch * 0.5 * k * sin(k * t)
 	return Vector3(h, du * d.x, du * d.y)
 
 
 # ---------------------------------------------------------------- distribución
 
 func _define_layout() -> void:
-	# Quarter pipe grande en el lado oeste (con deck y coping).
-	_qp(Vector2(-23.4, 0.0), Vector2(-1, 0), 28.0, 2.2, 1.6, C_SLATE)
-	# Quarter pipe mediano en el lado este.
-	_qp(Vector2(24.4, -3.0), Vector2(1, 0), 20.0, 1.6, 1.5, C_MAUVE)
-	# Banco largo en el lado norte, con plataforma arriba.
-	_bank(Vector2(2.0, -10.0), Vector2(0, -1), 32.0, 1.5, 3.5, 3.5, C_WOOD_SIDE)
+	# Oeste: deck elevado en todo el extremo, con escalera de 6 y dos barandillas hacia
+	# el sur, bank de subida por el este y canto grindable donde cae a pelo.
+	_box(Vector2(-28.0, -17.0), Vector2(-19.0, 4.0), 1.3, C_CONCRETE, C_CONCRETE_DARK, true)
+	_stairs(Vector2(-23.5, 7.5), Vector2(0, -1), 5.0, 1.3, 3.5, 6)
+	for x in [-25.4, -21.6]:
+		_rail(Vector3(x, 1.94, 3.7), Vector3(x, 0.36, 7.8), "rail")
+	_bank(Vector2(-14.0, -10.0), Vector2(-1, 0), 10.0, 1.3, 5.0, 0.0, C_SLATE)
+	_rail(Vector3(-19.0, 1.3, -4.8), Vector3(-19.0, 1.3, 3.8), "ledge")
+	# Esquina suroeste: quarter pequeño mirando al este.
+	_qp(Vector2(-23.4, 12.5), Vector2(-1, 0), 9.0, 1.8, 1.4, C_CORAL)
 
-	# Funbox central: pirámide con bancos a los cuatro lados y ledge encima.
-	_box(Vector2(-4.0, -3.0), Vector2(4.0, 1.0), 0.9, C_WOOD, C_WOOD_SIDE)
-	_bank(Vector2(0.0, 3.2), Vector2(0, -1), 8.0, 0.9, 2.2, 0.0, C_WOOD_SIDE)
-	_bank(Vector2(0.0, -5.2), Vector2(0, 1), 8.0, 0.9, 2.2, 0.0, C_WOOD_SIDE)
-	_bank(Vector2(6.2, -1.0), Vector2(-1, 0), 4.0, 0.9, 2.2, 0.0, C_WOOD_SIDE)
-	_bank(Vector2(-6.2, -1.0), Vector2(1, 0), 4.0, 0.9, 2.2, 0.0, C_WOOD_SIDE)
-	_ledge_box(Vector2(-3.0, -1.3), Vector2(3.0, -0.7), 1.3, C_CONCRETE_DARK)
+	# Norte: plaza elevada con bank hacia el centro, barandilla bajando por el bank,
+	# flat rail arriba, ledge al fondo y una jardinera en el canto.
+	_box(Vector2(-12.0, -17.0), Vector2(8.0, -9.0), 0.9, C_CONCRETE, C_CONCRETE_DARK, true)
+	_bank(Vector2(-2.0, -5.0), Vector2(0, -1), 20.0, 0.9, 4.0, 0.0, C_WOOD_SIDE)
+	_rail(Vector3(3.0, 1.35, -9.1), Vector3(3.0, 0.45, -5.1), "rail")
+	_rail(Vector3(-8.0, 1.32, -13.0), Vector3(-1.0, 1.32, -13.0), "rail")
+	_ledge_box(Vector2(4.0, -15.0), Vector2(8.0, -14.4), 1.4, C_MAUVE)
+	_box(Vector2(5.9, -10.8), Vector2(7.1, -9.6), 1.4, C_OCHRE, C_CORAL, true)
 
-	# Plataforma sur con escalera de 5 peldaños, dos barandillas y rampa de subida.
-	_box(Vector2(-6.0, 11.0), Vector2(10.0, 17.0), 1.2, C_CONCRETE, C_CONCRETE_DARK, true)
-	_stairs(Vector2(3.0, 8.5), Vector2(0, 1), 4.0, 1.2, 2.5, 5)
-	for x in [1.4, 4.6]:
-		_rail(Vector3(x, 1.84, 11.3), Vector3(x, 0.36, 8.2), "rail")
-	_bank(Vector2(-3.5, 8.0), Vector2(0, 1), 5.0, 1.2, 3.0, 0.0, C_CONCRETE_DARK)
-	_rail(Vector3(5.2, 1.2, 11.0), Vector3(10.0, 1.2, 11.0), "ledge")
+	# Este: quarter grande a lo ancho de todo el extremo, con deck y coping.
+	_qp(Vector2(23.2, 0.0), Vector2(1, 0), 30.0, 2.4, 1.6, C_SLATE)
 
-	# Ledge largo (hubba plano) en el lado oeste.
-	_ledge_box(Vector2(-18.0, 8.75), Vector2(-10.0, 9.25), 0.45, C_CONCRETE_DARK)
-	# Manual pad.
-	_ledge_box(Vector2(8.0, 2.0), Vector2(14.0, 5.0), 0.35, C_SLATE, C_CONCRETE)
-	# Flat rail.
-	_rail(Vector3(-13.0, 0.42, 4.0), Vector3(-5.0, 0.42, 4.0), "rail")
-	# Kicker hacia el quarter grande.
-	_bank(Vector2(-12.0, -6.0), Vector2(-1, 0), 3.0, 0.6, 1.3, 0.0, C_CORAL)
-	# Banco a caja con ledge en el lado este.
-	_bank(Vector2(14.0, 10.0), Vector2(1, 0), 4.0, 0.8, 2.0, 0.0, C_CONCRETE_DARK)
-	_ledge_box(Vector2(16.0, 8.0), Vector2(20.0, 12.0), 0.8, C_MAUVE, C_CONCRETE, true)
+	# Isla central-este (el óvalo de la referencia): funbox bajo con banks en los
+	# cuatro lados, wedge-ledge encima y una barra en el extremo.
+	_box(Vector2(10.0, -1.0), Vector2(17.0, 5.0), 0.7, C_WOOD, C_WOOD_SIDE)
+	_bank(Vector2(7.5, 2.0), Vector2(1, 0), 6.0, 0.7, 2.5, 0.0, C_WOOD_SIDE)
+	_bank(Vector2(19.5, 2.0), Vector2(-1, 0), 6.0, 0.7, 2.5, 0.0, C_WOOD_SIDE)
+	_bank(Vector2(13.5, -3.5), Vector2(0, 1), 7.0, 0.7, 2.5, 0.0, C_WOOD_SIDE)
+	_bank(Vector2(13.5, 7.5), Vector2(0, -1), 7.0, 0.7, 2.5, 0.0, C_WOOD_SIDE)
+	_ledge_box(Vector2(10.5, 1.6), Vector2(13.5, 2.4), 1.2, C_CONCRETE_DARK)
+	_rail(Vector3(15.6, 1.12, 0.6), Vector3(15.6, 1.12, 3.4), "rail")
+
+	# Sur: bank largo y bajo a lo largo del lado sur, con deck arriba.
+	_bank(Vector2(0.0, 12.0), Vector2(0, 1), 28.0, 1.4, 4.0, 1.0, C_WOOD_SIDE)
+	_box(Vector2(-0.6, 9.9), Vector2(0.6, 11.1), 0.55, C_OCHRE, C_CORAL, true)
+
+	# Suelo central: flat rail largo y ledge bajo (manual pad).
+	_rail(Vector3(-6.0, 0.42, 3.0), Vector3(2.0, 0.42, 3.0), "rail")
+	_ledge_box(Vector2(-10.0, 6.0), Vector2(-4.0, 7.0), 0.45, C_CONCRETE_DARK)
+
+	# Módulos colocados a mano en el editor (ParkModule): suman su física y rails.
+	for m in modules:
+		m.register(self)
 
 
 func _qp(origin: Vector2, dir: Vector2, width: float, height: float, deck: float, side: Color) -> void:
@@ -206,6 +230,8 @@ func _rail(a: Vector3, b: Vector3, kind: String) -> void:
 func _build_meshes() -> void:
 	_begin()
 	for s in shapes:
+		if s.get("nomesh", false):
+			continue # el módulo dibuja su propia malla
 		match String(s["type"]):
 			"box":
 				_mesh_box(s)
@@ -216,7 +242,8 @@ func _build_meshes() -> void:
 			"stairs":
 				_mesh_stairs(s)
 	for r in rails:
-		_mesh_rail(r)
+		if not r.get("nomesh", false):
+			_mesh_rail(r)
 	# Suelo de hormigón por losas (cada losa con un tono ligeramente distinto)
 	var slab := 4.0
 	var x := -HALF_X
@@ -230,12 +257,12 @@ func _build_meshes() -> void:
 			z += slab
 		x += slab
 	_perimeter()
-	# Valla de madera sobre la plataforma norte
-	for i in range(0, 17):
-		var fx := -14.0 + i * 2.0
-		_cuboid(Vector3(fx - 0.05, 1.5, -16.75), Vector3(fx + 0.05, 2.4, -16.65), C_WOOD_SIDE)
-	_cuboid(Vector3(-14.0, 2.25, -16.78), Vector3(18.0, 2.35, -16.62), C_WOOD)
-	_cuboid(Vector3(-14.0, 1.85, -16.78), Vector3(18.0, 1.92, -16.62), C_WOOD)
+	# Valla de madera al fondo de la plaza norte
+	for i in range(0, 11):
+		var fx := -12.0 + i * 2.0
+		_cuboid(Vector3(fx - 0.05, 0.9, -16.75), Vector3(fx + 0.05, 1.8, -16.65), C_WOOD_SIDE)
+	_cuboid(Vector3(-12.0, 1.65, -16.78), Vector3(8.0, 1.75, -16.62), C_WOOD)
+	_cuboid(Vector3(-12.0, 1.25, -16.78), Vector3(8.0, 1.32, -16.62), C_WOOD)
 	_finish("Park")
 
 
