@@ -35,8 +35,9 @@ enum State { RIDING, AIR, GRIND, BAIL }
 @export var spin_rate := 8.0
 @export_group("Aire")
 @export var gravity := 17.0
-@export var pop_min := 4.5
-@export var pop_max := 5.7
+## Velocidad vertical del pop con el flick más corto y con el más largo (FSA-169).
+@export var pop_min := 4.0
+@export var pop_max := 6.0
 ## Fracción del truco que debe estar completada al tocar suelo para no caerse.
 @export var land_tolerance := 0.85
 @export var bail_time := 1.8
@@ -168,6 +169,9 @@ var audio: SkaterAudio
 const BAIL_FADE_START := 0.75
 const BAIL_FADE_TIME := 0.45
 var _fade := 1.0
+## Punto de reset elegido por el jugador (ver mark_spot / go_to_spot).
+var _spot_pos := Vector3.ZERO
+var _spot_yaw := 0.0
 var _safe_pos := Vector3.ZERO
 var _safe_yaw := 0.0
 var _safe_t := 0.0
@@ -554,8 +558,10 @@ func _start_trick(id: String) -> void:
 	_catch_time = -1.0
 	var flip: float = _trick["flip"]
 	var shove: float = _trick["shove"]
-	_flip_dir = signf(flip)
-	_shove_dir = signf(shove)
+	# La tabla gira hacia donde va el stick (FSA-169): kickflip / BS shove con el
+	# stick a la izquierda, heelflip / FS shove a la derecha, visto desde la cámara.
+	_flip_dir = -signf(flip)
+	_shove_dir = -signf(shove)
 	_flip_target = absf(flip) * TAU
 	_shove_target = absf(shove) * PI
 	_flip_done = 0.0
@@ -1021,6 +1027,22 @@ func _bail_process(delta: float) -> void:
 
 func _respawn() -> void:
 	reset_skater(_safe_pos, _safe_yaw)
+	_fade = 0.0
+
+
+## Fija el punto de reset en la posición actual (FSA-169). Solo rodando por el suelo,
+## salvo con force (al empezar la sesión).
+func mark_spot(force := false) -> bool:
+	if not force and state != State.RIDING:
+		return false
+	_spot_pos = position
+	_spot_yaw = heading
+	return true
+
+
+## Vuelve al punto de reset (para repetir trucos en un spot o si te quedas atascado).
+func go_to_spot() -> void:
+	reset_skater(_spot_pos, _spot_yaw)
 	_fade = 0.0
 
 

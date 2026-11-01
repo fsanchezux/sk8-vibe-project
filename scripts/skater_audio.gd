@@ -55,8 +55,8 @@ func land(strength: float) -> void:
 
 ## Derrape de las ruedas en un revert.
 func skid(strength: float) -> void:
-	_skid.pitch_scale = randf_range(0.92, 1.08)
-	_skid.volume_db = lerpf(-12.0, -1.0, clampf(strength, 0.0, 1.0))
+	_skid.pitch_scale = randf_range(0.94, 1.06)
+	_skid.volume_db = lerpf(-20.0, -9.0, clampf(strength, 0.0, 1.0))
 	_skid.play()
 
 
@@ -214,23 +214,30 @@ func _make_grind() -> AudioStreamWAV:
 
 
 func _make_skid() -> AudioStreamWAV:
-	# Uretano rascando el hormigón: ruido áspero con un chirrido que baja de tono.
+	# Ruedas deslizando de lado sobre el hormigón: un "shhh" suave y apagado con el
+	# grano del uretano rozando, sin chirrido. Una tirada de _rng por muestra, como
+	# antes, para no cambiar los sonidos que se generan después.
 	var n := int(RATE * 0.6)
 	var s := PackedFloat32Array()
 	s.resize(n)
 	var lp := 0.0
 	var lp2 := 0.0
-	var phase := 0.0
+	var rumble := 0.0
+	var grain := 0.0
 	for i in n:
 		var t := float(i) / RATE
-		var env := minf(t / 0.03, 1.0) * exp(-t * 4.5)
+		var env := minf(t / 0.05, 1.0) * exp(-t * 4.0) * (1.0 - smoothstep(0.42, 0.6, t))
 		var noise := _rng.randf_range(-1.0, 1.0)
-		lp += (noise - lp) * 0.35
-		lp2 += (lp - lp2) * 0.05
-		var rasp := (lp - lp2) * 1.4
-		phase += TAU * (820.0 - t * 380.0 + sin(t * 70.0) * 25.0) / RATE
-		var squeal := sin(phase) * 0.25 * exp(-t * 3.0)
-		s[i] = (rasp + squeal) * env
+		# Banda media-grave (sin agudos): el siseo del deslizamiento
+		lp += (noise - lp) * 0.18
+		lp2 += (lp - lp2) * 0.02
+		var hiss := lp - lp2
+		# Fondo grave de la tabla vibrando
+		rumble += (noise - rumble) * 0.008
+		# Grano irregular de las ruedas al rozar (va frenando)
+		grain += TAU * (52.0 - t * 30.0) / RATE
+		var rough := 0.7 + 0.3 * sin(grain) * sin(grain * 0.37)
+		s[i] = (hiss * 0.9 * rough + rumble * 2.0) * env
 	return _wav(s, false)
 
 

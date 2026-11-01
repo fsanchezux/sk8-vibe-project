@@ -23,7 +23,12 @@ no la respeten no se aceptarán.
 
 - **Mitad izquierda**: stick flotante de movimiento lateral. Doble toque = grab.
 - **Mitad derecha**: flick hacia arriba o toque para empujar; flicks para trucos.
-- En escritorio el ratón emula el toque.
+  Cuanto más largo es el recorrido del flick (de abajo del todo a arriba del todo),
+  más alto es el salto. El trazo del dedo se queda dibujado hasta que cae el truco.
+- **fijar / volver** (arriba a la derecha): marca un punto de reset donde estás y
+  vuelve a él cuando quieras repetir un spot o si te quedas atascado.
+- En escritorio el ratón emula el toque. Teclado: flechas = stick derecho,
+  Espacio = ollie, W = empujar, K = grab, F = fijar spot, R = volver al spot.
 
 ## Requisitos
 

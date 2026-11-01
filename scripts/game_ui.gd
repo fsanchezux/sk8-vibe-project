@@ -11,6 +11,9 @@ signal restart_requested
 signal menu_requested
 signal quit_requested
 signal back_requested
+## Botones del punto de reset (FSA-169).
+signal spot_mark_requested
+signal spot_return_requested
 
 const FONT := preload("res://assets/fonts/Nunito-ExtraBold.ttf")
 const FONT_LOGO := preload("res://assets/fonts/Nunito-Black.ttf")
@@ -242,6 +245,27 @@ func _build_hud() -> Control:
 	pause_btn.offset_top = 56
 	pause_btn.offset_bottom = 136
 	root.add_child(pause_btn)
+
+	# Punto de reset: "fijar" lo pone donde estás y "volver" te devuelve allí.
+	# Van en la franja superior, donde los sticks no reciben toques.
+	var back_btn := _round_button("volver", func(): spot_return_requested.emit())
+	back_btn.add_theme_font_size_override("font_size", 18)
+	back_btn.custom_minimum_size = Vector2(72, 72)
+	back_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	back_btn.offset_left = -204
+	back_btn.offset_right = -132
+	back_btn.offset_top = 60
+	back_btn.offset_bottom = 132
+	root.add_child(back_btn)
+	var mark_btn := _round_button("fijar", func(): spot_mark_requested.emit())
+	mark_btn.add_theme_font_size_override("font_size", 18)
+	mark_btn.custom_minimum_size = Vector2(72, 72)
+	mark_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	mark_btn.offset_left = -288
+	mark_btn.offset_right = -216
+	mark_btn.offset_top = 60
+	mark_btn.offset_bottom = 132
+	root.add_child(mark_btn)
 
 	_combo_label = _label("", 26, Color(CREAM, 0.85))
 	_combo_label.set_anchors_preset(Control.PRESET_CENTER_TOP)

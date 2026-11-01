@@ -57,6 +57,10 @@ func _ready() -> void:
 	add_child(ui)
 	skater.touch = ui.touch
 	ui.touch.flick = skater.flick
+	skater.landed.connect(ui.touch.end_trail)
+	skater.bailed.connect(ui.touch.end_trail)
+	ui.spot_mark_requested.connect(_mark_spot)
+	ui.spot_return_requested.connect(_return_to_spot)
 
 	ui.start_requested.connect(func(): ui.fade_through(_start))
 	ui.pause_requested.connect(_pause)
@@ -135,6 +139,7 @@ func _start() -> void:
 	ui.set_time(time_left)
 	ui.set_combo("", 0, 0)
 	skater.reset_skater(park.spawn_pos, park.spawn_yaw)
+	skater.mark_spot(true)
 	skater.input_enabled = true
 	camera.orbit = false
 	camera.snap()
@@ -204,6 +209,34 @@ func _on_landed() -> void:
 	# A partir de x3, cada truco que cae suena y suelta unas pocas chispas
 	if state == GameState.PLAYING and combo.multiplier() >= 3:
 		skater.celebrate(combo.multiplier())
+
+
+## Teclado: F = fijar el punto de reset, R = volver a él.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_F:
+			_mark_spot()
+		elif event.physical_keycode == KEY_R:
+			_return_to_spot()
+
+
+func _mark_spot() -> void:
+	if state != GameState.PLAYING:
+		return
+	if skater.mark_spot():
+		ui.popup_trick("SPOT FIJADO", GameUI.YELLOW)
+
+
+## Volver al spot pierde el combo en curso (si no, se podría encadenar sin fin).
+func _return_to_spot() -> void:
+	if state != GameState.PLAYING:
+		return
+	combo.clear()
+	_ground_t = -1.0
+	ui.set_combo("", 0, 0)
+	ui.touch.reset()
+	skater.go_to_spot()
+	camera.snap()
 
 
 func _on_bailed() -> void:
