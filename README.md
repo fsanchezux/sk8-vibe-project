@@ -7,6 +7,16 @@ manuals en un skatepark low-poly al atardecer.
 > Estado: prototipo temprano (v0.1). ¡Se aceptan contribuciones! Mira el
 > [ROADMAP](ROADMAP.md) y [CONTRIBUTING](CONTRIBUTING.md).
 
+## ⚠️ Lee el moodboard antes de contribuir
+
+**Es imprescindible leer el moodboard antes de hacer cualquier contribución**
+(código, gráficos o sonidos). Define la dirección artística del juego y los PR que
+no la respeten no se aceptarán.
+
+- 📌 Tablero de Pinterest: https://pin.it/3eSmdPFaN
+- 🎨 Archivo PSD en el repo: [moodboard/moodboard.psd](moodboard/moodboard.psd)
+- 📁 Carpeta y normas: [moodboard/](moodboard/README.md)
+
 ## Controles (táctil)
 
 - **Mitad izquierda**: stick flotante de movimiento lateral. Doble toque = grab.

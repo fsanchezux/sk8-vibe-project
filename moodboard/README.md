@@ -4,6 +4,11 @@ Referencias visuales y de ambiente del juego: paleta, estilo, skateparks,
 personajes, interfaz. Sirve para que quien contribuya mantenga la misma dirección
 artística.
 
+> **Lectura obligatoria antes de cualquier contribución.**
+
+- 📌 Pinterest: https://pin.it/3eSmdPFaN
+- 🎨 PSD: [moodboard.psd](moodboard.psd) (si pesa más de 50 MB, súbelo con Git LFS)
+
 ## Qué poner aquí
 
 - Imágenes de referencia (`.png`, `.jpg`, `.webp`) y capturas de progreso.

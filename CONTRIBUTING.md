@@ -1,6 +1,13 @@
 # Cómo contribuir
 
-¡Gracias por querer ayudar! Flujo básico:
+¡Gracias por querer ayudar!
+
+> ⚠️ **Antes de hacer cualquier contribución es imprescindible leer el
+> [moodboard](moodboard/README.md)**: [Pinterest](https://pin.it/3eSmdPFaN) y el
+> archivo [moodboard.psd](moodboard/moodboard.psd). Los PR que no respeten la
+> dirección artística no se aceptarán.
+
+Flujo básico:
 
 1. Busca en los [issues](../../issues) algo con la etiqueta `good first issue` o
    `help wanted`, o abre uno nuevo para proponer tu idea **antes** de hacer
