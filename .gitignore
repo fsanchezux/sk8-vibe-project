@@ -1,0 +1,19 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Builds (se distribuyen en GitHub Releases, no en el repo)
+build/
+*.apk
+*.aab
+*.idsig
+
+# Claves de firma: NUNCA subirlas
+*.keystore
+*.jks
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
