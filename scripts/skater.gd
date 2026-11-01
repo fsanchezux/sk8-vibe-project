@@ -178,8 +178,12 @@ var _safe_t := 0.0
 var _braking := false
 var _brake_k := 0.0
 var _prev_tail := Vector3.ZERO
-var _sparks: CPUParticles3D
+## Fuerza del pop del truco en curso (0..1): más altura vale más puntos.
+var _pop_power := 1.0
 var skid_marks: SkidMarks
+
+## Fuerza del pop con el teclado manteniendo Mayús (sin Mayús es 1.0).
+const KB_SOFT_POWER := 0.3
 
 ## Revert: a partir de cuántos grados de desvío al aterrizar se hace revert en vez de caerse.
 const REVERT_MIN_DEG := 80.0
@@ -199,56 +203,11 @@ func _ready() -> void:
 	add_child(model)
 	audio = SkaterAudio.new()
 	add_child(audio)
-	_sparks = _make_sparks()
-	add_child(_sparks)
 
 
-## Celebración al caer un truco con combo x2 o más: chispas y sonido (más con más multiplicador).
+## Celebración al caer un truco con combo alto: solo sonido (más brillante con más multiplicador).
 func celebrate(level: int) -> void:
 	audio.celebrate(level)
-	_sparks.amount = clampi(4 + level * 2, 8, 22)
-	_sparks.initial_velocity_max = 2.4 + level * 0.2
-	_sparks.restart()
-	_sparks.emitting = true
-
-
-func _make_sparks() -> CPUParticles3D:
-	var p := CPUParticles3D.new()
-	p.one_shot = true
-	p.emitting = false
-	p.explosiveness = 0.92
-	p.lifetime = 0.7
-	p.position = Vector3(0.0, 0.12, 0.0)
-	p.direction = Vector3.UP
-	p.spread = 75.0
-	p.initial_velocity_min = 1.8
-	p.initial_velocity_max = 4.0
-	p.gravity = Vector3(0.0, -7.0, 0.0)
-	p.damping_min = 1.0
-	p.damping_max = 2.5
-	p.scale_amount_min = 0.5
-	p.scale_amount_max = 1.2
-	var curve := Curve.new()
-	curve.add_point(Vector2(0.0, 1.0))
-	curve.add_point(Vector2(1.0, 0.0))
-	p.scale_amount_curve = curve
-	var grad := Gradient.new()
-	grad.set_color(0, Color(1.0, 0.95, 0.6))
-	grad.set_color(1, Color(1.0, 0.45, 0.2, 0.0))
-	p.color_ramp = grad
-	var quad := QuadMesh.new()
-	quad.size = Vector2(0.05, 0.05)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.vertex_color_use_as_albedo = true
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.7, 0.3)
-	mat.emission_energy_multiplier = 2.5
-	quad.material = mat
-	p.mesh = quad
-	return p
 
 
 func reset_skater(pos := Vector3.ZERO, yaw := 0.0) -> void:
@@ -582,6 +541,7 @@ func _start_trick(id: String) -> void:
 	else:
 		_hold_zone = ""
 	_crouch = 0.0
+	_pop_power = flick.power
 	audio.pop(flick.power)
 	impact.emit(0.25 + flick.power * 0.2)
 
@@ -684,6 +644,8 @@ func _trick_points() -> int:
 	var pts := float(_trick["points"]) * (1.0 + 0.9 * extra)
 	if _nollie:
 		pts *= 1.25
+	# Intensidad (FSA-179): un pop bajo vale un 20 % menos y el más alto un 30 % más.
+	pts *= lerpf(0.8, 1.3, _pop_power)
 	return int(pts)
 
 
@@ -1046,6 +1008,15 @@ func go_to_spot() -> void:
 	_fade = 0.0
 
 
+func spot_position() -> Vector3:
+	return _spot_pos
+
+
+## No se puede volver al spot en mitad de un truco (aire o grind): sería un toque por error.
+func can_return_to_spot() -> bool:
+	return state != State.AIR and state != State.GRIND
+
+
 ## Guarda la posición como sitio seguro para reaparecer si es suelo llano y despejado.
 func _remember_safe_spot(delta: float) -> void:
 	_safe_t += delta
@@ -1096,6 +1067,8 @@ func _read_right() -> void:
 		float(Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_LEFT)),
 		float(Input.is_physical_key_pressed(KEY_DOWN)) - float(Input.is_physical_key_pressed(KEY_UP)))
 	kb = kb.normalized()
+	# Sin recorrido que medir con teclas, la intensidad es fija: Mayús = pop suave.
+	flick.power_cap = KB_SOFT_POWER if Input.is_physical_key_pressed(KEY_SHIFT) else 1.0
 	if kb != Vector2.ZERO or _kb_right_last != Vector2.ZERO:
 		flick.feed(kb)
 	_kb_right_last = kb

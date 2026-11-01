@@ -12,6 +12,10 @@ const RECORDS_PATH := "user://records.cfg"
 const MUSIC_PATH := "res://assets/audio/ambient.mp3"
 ## Cámara lenta en los trucos: cuánto se frena el tiempo como máximo (0.2 = al 80 %).
 const SLOWMO := 0.2
+## Con un combo largo la cámara lenta crece hasta este máximo (FSA-203, de prueba).
+const SLOWMO_MAX := 0.45
+## Trucos encadenados con los que se alcanza SLOWMO_MAX.
+const SLOWMO_FULL_COMBO := 7
 
 var state := GameState.MENU
 var score := 0
@@ -25,6 +29,7 @@ var camera: ChaseCamera
 var ui: GameUI
 var combo := Combo.new()
 var _ground_t := -1.0
+var _spot_marker: MeshInstance3D
 
 
 func _ready() -> void:
@@ -102,9 +107,10 @@ func _notification(what: int) -> void:
 
 
 ## Ralentiza muy ligeramente el tiempo mientras se hace un truco (entra y sale suave).
-## El sonido baja un poco de tono con él.
+## El sonido baja un poco de tono con él. Cuantos más trucos seguidos, más se nota.
 func _update_slowmo(real_dt: float) -> void:
-	var target := 1.0 - SLOWMO * skater.trick_focus()
+	var chain := clampf(float(combo.multiplier() - 1) / float(SLOWMO_FULL_COMBO - 1), 0.0, 1.0)
+	var target := 1.0 - lerpf(SLOWMO, SLOWMO_MAX, chain) * skater.trick_focus()
 	Engine.time_scale = lerpf(Engine.time_scale, target, 1.0 - exp(-real_dt * 7.0))
 	AudioServer.playback_speed_scale = lerpf(1.0, Engine.time_scale, 0.5)
 
@@ -122,6 +128,8 @@ func _go_menu() -> void:
 	state = GameState.MENU
 	skater.input_enabled = false
 	skater.reset_skater(park.spawn_pos, park.spawn_yaw)
+	if _spot_marker:
+		_spot_marker.visible = false
 	camera.orbit = true
 	camera.snap()
 	ui.show_menu(best_score)
@@ -140,6 +148,7 @@ func _start() -> void:
 	ui.set_combo("", 0, 0)
 	skater.reset_skater(park.spawn_pos, park.spawn_yaw)
 	skater.mark_spot(true)
+	_place_spot_marker()
 	skater.input_enabled = true
 	camera.orbit = false
 	camera.snap()
@@ -206,17 +215,22 @@ func _on_trick_done(trick_name: String, points: int) -> void:
 
 func _on_landed() -> void:
 	_ground_t = 0.0
-	# A partir de x3, cada truco que cae suena y suelta unas pocas chispas
+	# A partir de x3, cada truco que cae suena (sin chispas)
 	if state == GameState.PLAYING and combo.multiplier() >= 3:
 		skater.celebrate(combo.multiplier())
 
 
-## Teclado: F = fijar el punto de reset, R = volver a él.
+## Punto de reset en teclado: F = fijar, R = volver. En mando: Back/Select = fijar, Y = volver.
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == KEY_F:
 			_mark_spot()
 		elif event.physical_keycode == KEY_R:
+			_return_to_spot()
+	elif event is InputEventJoypadButton and event.pressed:
+		if event.button_index == JOY_BUTTON_BACK:
+			_mark_spot()
+		elif event.button_index == JOY_BUTTON_Y:
 			_return_to_spot()
 
 
@@ -224,12 +238,33 @@ func _mark_spot() -> void:
 	if state != GameState.PLAYING:
 		return
 	if skater.mark_spot():
+		_place_spot_marker()
 		ui.popup_trick("SPOT FIJADO", GameUI.YELLOW)
 
 
-## Volver al spot pierde el combo en curso (si no, se podría encadenar sin fin).
+## Aro amarillo en el suelo que enseña dónde está el punto de reset.
+func _place_spot_marker() -> void:
+	if _spot_marker == null:
+		var ring := TorusMesh.new()
+		ring.inner_radius = 0.55
+		ring.outer_radius = 0.7
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color(1.0, 0.85, 0.2, 0.8)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		ring.material = mat
+		_spot_marker = MeshInstance3D.new()
+		_spot_marker.mesh = ring
+		_spot_marker.scale = Vector3(1.0, 0.05, 1.0)
+		add_child(_spot_marker)
+	_spot_marker.position = skater.spot_position() + Vector3(0.0, 0.03, 0.0)
+	_spot_marker.visible = true
+
+
+## Volver al spot pierde el combo en curso (si no, se podría encadenar sin fin) y no
+## se puede hacer en mitad de un truco.
 func _return_to_spot() -> void:
-	if state != GameState.PLAYING:
+	if state != GameState.PLAYING or not skater.can_return_to_spot():
 		return
 	combo.clear()
 	_ground_t = -1.0

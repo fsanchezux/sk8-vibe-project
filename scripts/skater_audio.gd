@@ -263,6 +263,11 @@ func _make_celebrate() -> AudioStreamWAV:
 		hp = 0.6 * (hp + noise - prev)
 		prev = noise
 		s[i] += hp * 0.06 * exp(-t * 4.0) * minf(t / 0.08, 1.0)
+		# Golpe grave al inicio (da cuerpo) y destello agudo al final del arpegio
+		s[i] += sin(TAU * 110.0 * t) * exp(-t * 14.0) * 0.28
+		var tw := t - 0.2
+		if tw > 0.0:
+			s[i] += sin(TAU * 2093.0 * tw) * exp(-tw * 7.0) * minf(tw / 0.003, 1.0) * 0.07
 	return _wav(s, false)
 
 

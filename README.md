@@ -26,9 +26,15 @@ no la respeten no se aceptarán.
   Cuanto más largo es el recorrido del flick (de abajo del todo a arriba del todo),
   más alto es el salto. El trazo del dedo se queda dibujado hasta que cae el truco.
 - **fijar / volver** (arriba a la derecha): marca un punto de reset donde estás y
-  vuelve a él cuando quieras repetir un spot o si te quedas atascado.
+  vuelve a él cuando quieras repetir un spot o si te quedas atascado. Un aro amarillo
+  marca el spot; volver cuesta el combo en curso y no funciona en el aire ni en un grind.
+- Más altura de pop = más puntos (de ×0,8 a ×1,3 en cada truco). Con un combo largo la
+  cámara lenta de los trucos se nota más; a partir de x3 cada truco suena a campanitas.
 - En escritorio el ratón emula el toque. Teclado: flechas = stick derecho,
   Espacio = ollie, W = empujar, K = grab, F = fijar spot, R = volver al spot.
+  Mayús mantenido = pop suave (el teclado no mide recorrido).
+- Mando: stick derecho = trucos (misma intensidad por recorrido que en táctil),
+  Back/Select = fijar spot, Y = volver al spot.
 
 ## Requisitos
 

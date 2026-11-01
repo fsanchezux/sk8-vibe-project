@@ -42,6 +42,8 @@ var up_pushes := true
 var phase := Phase.NEUTRAL
 ## Fuerza del pop del último truco (0..1), según el recorrido del flick.
 var power := 1.0
+## Tope de power para entradas sin recorrido (teclado con Mayús); 1.0 = sin tope.
+var power_cap := 1.0
 
 var _last := Vector2.ZERO
 var _queued := ""
@@ -79,7 +81,7 @@ func consume() -> String:
 ## Encola una acción directamente (atajos de teclado).
 func queue(id: String) -> void:
 	if id != "push":
-		power = 1.0
+		power = power_cap
 	_queued = id
 
 
@@ -209,7 +211,7 @@ func _fire(id: String) -> void:
 	# Shove-it (sin subir): cuenta lo que se ha ido hacia el lado.
 	var up := _peak if _peak > 0.0 else minf(absf(_last.x), 1.0)
 	var travel := _depth + up
-	power = clampf((travel - TRAVEL_MIN) / (TRAVEL_MAX - TRAVEL_MIN), 0.0, 1.0)
+	power = minf(clampf((travel - TRAVEL_MIN) / (TRAVEL_MAX - TRAVEL_MIN), 0.0, 1.0), power_cap)
 	_queued = ("nollie_" + id) if _nollie else id
 	_fired_nollie = _nollie
 	phase = Phase.LOCKED
