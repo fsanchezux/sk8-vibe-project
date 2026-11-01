@@ -1,3 +1,5 @@
+<img width="1871" height="1023" alt="portada" src="https://github.com/user-attachments/assets/b8110296-bd67-4562-8e2e-1c0ea68bcac0" />
+
 # sk8-vibe-project
 
 Juego de skate para móvil hecho con **Godot 4.7** (renderer Mobile, Jolt Physics).
