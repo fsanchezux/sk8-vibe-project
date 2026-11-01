@@ -1,9 +1,14 @@
 class_name SkaterAudio
 extends Node
-## Sonidos del skater sintetizados por código (no hace falta ningún archivo):
-## pop del tail, "clac" al planchar el truco, aterrizaje, rodadura y grind.
+## Sonidos del skater: pop del tail, "clac" al planchar el truco, aterrizaje,
+## rodadura, grind, derrape, celebración y tail arrastrando.
+## Cada sonido se busca como archivo en assets/audio/sfx/<nombre>.wav (o .ogg/.mp3)
+## y, si no existe, se sintetiza por código. Para cambiar uno basta con sustituir el
+## archivo (ver assets/audio/README.md).
 
 const RATE := 22050
+const SFX_DIR := "res://assets/audio/sfx/"
+const SFX_EXT := ["wav", "ogg", "mp3"]
 
 var _pop: AudioStreamPlayer
 var _catch: AudioStreamPlayer
@@ -18,14 +23,14 @@ var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	_rng.seed = 7
-	_pop = _player(_make_pop(), -2.0)
-	_catch = _player(_make_click(), -6.0)
-	_land = _player(_make_land(), 0.0)
-	_roll = _player(_make_roll(), -80.0)
-	_grind = _player(_make_grind(), -80.0)
-	_skid = _player(_make_skid(), -4.0)
-	_celebrate = _player(_make_celebrate(), -5.0)
-	_scrape = _player(_make_scrape(), -80.0)
+	_pop = _player(_sfx("pop", _make_pop(), false), -2.0)
+	_catch = _player(_sfx("catch", _make_click(), false), -6.0)
+	_land = _player(_sfx("land", _make_land(), false), 0.0)
+	_roll = _player(_sfx("roll", _make_roll(), true), -80.0)
+	_grind = _player(_sfx("grind", _make_grind(), true), -80.0)
+	_skid = _player(_sfx("skid", _make_skid(), false), -4.0)
+	_celebrate = _player(_sfx("celebrate", _make_celebrate(), false), -5.0)
+	_scrape = _player(_sfx("scrape", _make_scrape(), true), -80.0)
 	_scrape.play()
 	_roll.play()
 	_grind.play()
@@ -83,6 +88,33 @@ func update(rolling: float, grinding: float) -> void:
 	var g := clampf(grinding / 6.0, 0.25, 1.0) if grinding > 0.0 else 0.0
 	_grind.volume_db = linear_to_db(maxf(g * 0.6, 0.0001))
 	_grind.pitch_scale = 0.85 + g * 0.3
+
+
+## Archivo de assets/audio/sfx/ si existe; si no, el sonido sintetizado.
+func _sfx(sfx_name: String, fallback: AudioStreamWAV, loop: bool) -> AudioStream:
+	for ext in SFX_EXT:
+		var path: String = SFX_DIR + sfx_name + "." + ext
+		if not ResourceLoader.exists(path):
+			continue
+		var stream := load(path) as AudioStream
+		if stream == null:
+			continue
+		if loop:
+			_set_loop(stream)
+		return stream
+	return fallback
+
+
+func _set_loop(stream: AudioStream) -> void:
+	if stream is AudioStreamWAV:
+		var w := stream as AudioStreamWAV
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_begin = 0
+		w.loop_end = int(w.get_length() * w.mix_rate)
+	elif stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
+	elif stream is AudioStreamMP3:
+		(stream as AudioStreamMP3).loop = true
 
 
 func _player(stream: AudioStream, db: float) -> AudioStreamPlayer:

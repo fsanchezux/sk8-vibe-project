@@ -9,6 +9,7 @@ Todo lo que hay aquí es editable y es lo que usa el juego directamente.
 | `character/skater_skater.res` | Malla **generada**, no editar a mano | Se regenera con el script de `tools/` |
 | `fonts/` | Fuentes (OFL) | Sustituir el `.ttf` manteniendo el nombre |
 | `audio/ambient.mp3` | Música ambiente | Sustituir el fichero manteniendo el nombre |
+| `audio/sfx/*.wav` | Efectos de sonido del skater | Ver [audio/README.md](audio/README.md) |
 
 Los ficheros `.import` los genera Godot; se versionan para que el import sea reproducible.
 
