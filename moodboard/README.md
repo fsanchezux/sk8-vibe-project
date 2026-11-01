@@ -29,5 +29,6 @@ Organízalo en subcarpetas si crece: `skatepark/`, `personaje/`, `ui/`, `color/`
 
 | Referencia | Autor / fuente | Para qué sirve |
 |---|---|---|
-| Street course de Tampa | Adrien Guigues, ArtStation | Distribución del skatepark (ver `scripts/skatepark.gd`) |
+| Street course de los X Games | Render del course (imagen de referencia) | Distribución actual del skatepark (ver `scripts/skatepark.gd`) |
+| Street course de Tampa | Adrien Guigues, ArtStation | Distribución anterior del skatepark |
 | _añade las tuyas_ | | |

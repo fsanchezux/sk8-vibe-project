@@ -112,37 +112,35 @@ func _place_decals() -> void:
 	if _tags.is_empty():
 		return
 	var up := Vector3.UP
-	var bank_n := Vector3(0.0, 1.0, 0.43).normalized()
-	var qp_n := Vector3(0.59, 1.0, 0.0).normalized()
+	var deck_bank_n := Vector3(0.26, 1.0, 0.0).normalized()
+	var plaza_bank_n := Vector3(0.0, 1.0, 0.23).normalized()
+	var south_bank_n := Vector3(0.0, 1.0, -0.35).normalized()
+	var qp_n := Vector3(-0.59, 1.0, 0.0).normalized()
 	var spots := [
 		# [centro, normal, ancho, alto]
-		[Vector3(-25.6, 0.9, 14.0), Vector3.BACK, 2.6, 1.3],
-		[Vector3(-25.6, 0.9, -14.0), Vector3.FORWARD, 2.6, 1.3],
-		[Vector3(26.2, 0.7, 7.0), Vector3.BACK, 2.2, 1.1],
-		[Vector3(26.2, 0.7, -13.0), Vector3.FORWARD, 2.2, 1.1],
-		[Vector3(-14.0, 0.6, -12.6), Vector3.LEFT, 2.2, 1.1],
-		[Vector3(18.0, 0.6, -12.6), Vector3.RIGHT, 2.2, 1.1],
-		[Vector3(-6.0, 0.75, -11.75), bank_n, 3.0, 1.5],
-		[Vector3(9.0, 0.75, -11.75), bank_n, 3.0, 1.5],
-		[Vector3(-25.0, 0.6, -6.0), qp_n, 2.6, 1.3],
-		[Vector3(-25.0, 0.6, 6.0), qp_n, 2.6, 1.3],
-		[Vector3(7.5, 0.6, 11.0), Vector3.FORWARD, 3.2, 1.1],
-		[Vector3(11.0, 0.17, 2.0), Vector3.FORWARD, 2.0, 0.6],
-		[Vector3(11.0, 0.17, 5.0), Vector3.BACK, 2.0, 0.6],
-		[Vector3(-14.0, 0.22, 8.75), Vector3.FORWARD, 2.2, 0.7],
-		[Vector3(-14.0, 0.22, 9.25), Vector3.BACK, 2.2, 0.7],
-		[Vector3(0.0, 1.1, -1.3), Vector3.FORWARD, 1.8, 0.6],
-		[Vector3(-20.0, 0.35, 17.0), Vector3.FORWARD, 2.0, 0.7],
-		[Vector3(16.0, 0.35, 17.0), Vector3.FORWARD, 2.0, 0.7],
-		[Vector3(28.0, 0.35, 12.0), Vector3.LEFT, 2.0, 0.7],
-		[Vector3(-16.0, 0.0, -1.5), up, 2.4, 1.2],
-		[Vector3(13.0, 0.0, -6.5), up, 2.4, 1.2],
-		[Vector3(18.0, 0.8, 10.0), up, 2.0, 1.0],
+		[Vector3(-20.0, 0.65, 4.0), Vector3.BACK, 1.6, 1.0],
+		[Vector3(-19.0, 0.65, 0.0), Vector3.RIGHT, 2.6, 1.1],
+		[Vector3(-16.5, 0.65, -10.0), deck_bank_n, 3.0, 1.5],
+		[Vector3(-7.0, 0.45, -7.0), plaza_bank_n, 3.0, 1.5],
+		[Vector3(7.0, 0.45, -7.0), plaza_bank_n, 2.4, 1.2],
+		[Vector3(25.2, 0.6, -8.0), qp_n, 2.6, 1.3],
+		[Vector3(25.2, 0.6, 8.0), qp_n, 2.6, 1.3],
+		[Vector3(-7.0, 0.7, 14.0), south_bank_n, 3.0, 1.5],
+		[Vector3(7.0, 0.7, 14.0), south_bank_n, 3.0, 1.5],
+		[Vector3(12.0, 0.95, 1.6), Vector3.FORWARD, 2.0, 0.5],
+		[Vector3(-7.0, 0.22, 6.0), Vector3.FORWARD, 2.2, 0.4],
+		[Vector3(-7.0, 0.22, 7.0), Vector3.BACK, 2.2, 0.4],
+		[Vector3(6.0, 1.15, -14.4), Vector3.BACK, 2.0, 0.5],
+		[Vector3(-18.0, 0.35, 17.0), Vector3.FORWARD, 2.0, 0.7],
+		[Vector3(18.0, 0.35, 17.0), Vector3.FORWARD, 2.0, 0.7],
+		[Vector3(15.0, 0.35, -17.0), Vector3.BACK, 2.0, 0.7],
+		[Vector3(-14.0, 0.0, 2.0), up, 2.4, 1.2],
+		[Vector3(19.0, 0.0, -8.0), up, 2.4, 1.2],
+		[Vector3(15.5, 0.7, 0.0), up, 1.6, 1.0],
 		# mobiliario
-		[Vector3(25.47, 0.55, 12.0), Vector3.LEFT, 1.6, 0.8],
-		[Vector3(-24.0, 0.55, 15.37), Vector3.FORWARD, 1.6, 0.8],
-		[Vector3(21.0, 0.5, 15.45), Vector3.FORWARD, 0.55, 0.45],
-		[Vector3(-17.0, 0.5, -9.55), Vector3.FORWARD, 0.55, 0.45],
+		[Vector3(-17.5, 0.55, 13.97), Vector3.FORWARD, 1.6, 0.8],
+		[Vector3(20.0, 0.55, 13.97), Vector3.FORWARD, 1.6, 0.8],
+		[Vector3(21.0, 0.5, -15.15), Vector3.BACK, 0.55, 0.45],
 	]
 	for i in spots.size():
 		var s: Array = spots[i]
@@ -171,15 +169,14 @@ func _decal(center: Vector3, n: Vector3, width: float, height: float, tex: Textu
 func _build_props() -> void:
 	_st = SurfaceTool.new()
 	_st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_dumpster(Vector3(26.0, 0.0, 12.0), PI * 0.5)
-	_dumpster(Vector3(-24.0, 0.0, 15.9), 0.0)
-	_bin(Vector3(21.0, 0.0, 15.8))
-	_bin(Vector3(-17.0, 0.0, -9.2))
-	_bin(Vector3(-16.2, 0.0, -9.3))
-	for p in [Vector3(9.0, 0, 7.0), Vector3(9.7, 0, 7.5), Vector3(-20.0, 0, 3.0), Vector3(22.0, 0, 10.0), Vector3(-8.0, 0, 13.0)]:
+	_dumpster(Vector3(-17.5, 0.0, 14.5), 0.0)
+	_dumpster(Vector3(20.0, 0.0, 14.5), 0.0)
+	_bin(Vector3(21.0, 0.0, -15.5))
+	_bin(Vector3(21.8, 0.0, -15.4))
+	for p in [Vector3(-2.0, 0, 9.0), Vector3(-1.3, 0, 9.5), Vector3(20.5, 0, 8.5), Vector3(-12.0, 0, 10.0)]:
 		_cone(p)
-	_sign(Vector3(14.0, 0.0, 16.3))
-	_sign(Vector3(-27.2, 0.0, -15.6))
+	_sign(Vector3(22.5, 0.0, -16.3))
+	_sign(Vector3(-14.8, 0.0, 16.3))
 	var mi := MeshInstance3D.new()
 	mi.mesh = _st.commit()
 	mi.material_override = Skatepark.lowpoly_material()
