@@ -7,7 +7,7 @@ artística.
 > **Lectura obligatoria antes de cualquier contribución.**
 
 - 📌 Pinterest: https://pin.it/3eSmdPFaN
-- 🎨 PSD: [moodboard.psd](moodboard.psd) (si pesa más de 50 MB, súbelo con Git LFS)
+- 🎨 Photoshop: [Moodboard sk8.psb](Moodboard%20sk8.psb) (si pesa más de 50 MB, súbelo con Git LFS)
 
 ## Qué poner aquí
 

@@ -14,7 +14,7 @@ manuals en un skatepark low-poly al atardecer.
 no la respeten no se aceptarán.
 
 - 📌 Tablero de Pinterest: https://pin.it/3eSmdPFaN
-- 🎨 Archivo PSD en el repo: [moodboard/moodboard.psd](moodboard/moodboard.psd)
+- 🎨 Archivo del moodboard (Photoshop) en el repo: [moodboard/Moodboard%20sk8.psb](moodboard/Moodboard%20sk8.psb)
 - 📁 Carpeta y normas: [moodboard/](moodboard/README.md)
 
 ## Controles (táctil)

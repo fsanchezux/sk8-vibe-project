@@ -4,7 +4,7 @@
 
 > ⚠️ **Antes de hacer cualquier contribución es imprescindible leer el
 > [moodboard](moodboard/README.md)**: [Pinterest](https://pin.it/3eSmdPFaN) y el
-> archivo [moodboard.psd](moodboard/moodboard.psd). Los PR que no respeten la
+> archivo [Moodboard sk8.psb](moodboard/Moodboard%20sk8.psb). Los PR que no respeten la
 > dirección artística no se aceptarán.
 
 Flujo básico:
