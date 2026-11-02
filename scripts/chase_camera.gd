@@ -97,12 +97,18 @@ func _update(delta: float, instant: bool) -> void:
 	_y = lerpf(_y, cam.y, 1.0 if instant else 1.0 - exp(-delta * 5.0))
 	cam.y = _y
 
-	# Dentro de la nave y por encima del suelo/rampas que haya bajo la cámara
+	# Dentro del mapa (park y carretera) y por encima del suelo/rampas bajo la cámara.
+	# Detrás de un murete (pared) no se sube: se queda a la altura que lleva.
 	var park := target.park
 	if park:
-		cam.x = clampf(cam.x, -Skatepark.HALF_X + 0.4, Skatepark.HALF_X - 0.4)
-		cam.z = clampf(cam.z, -Skatepark.HALF_Z + 0.4, Skatepark.HALF_Z - 0.4)
-		cam.y = clampf(cam.y, park.height_at(cam.x, cam.z) + 0.5, Skatepark.WALL_H - 0.8)
+		var x0 := park.road.x_min + 0.4 if park.road else -Skatepark.HALF_X + 0.4
+		var zh := maxf(park.road.z_half, Skatepark.HALF_Z) if park.road else Skatepark.HALF_Z
+		cam.x = clampf(cam.x, x0, Skatepark.HALF_X - 0.4)
+		cam.z = clampf(cam.z, -zh + 0.4, zh - 0.4)
+		var floor_y := park.height_at(cam.x, cam.z)
+		if floor_y < Skatepark.OUT_H:
+			cam.y = maxf(cam.y, floor_y + 0.5)
+		cam.y = minf(cam.y, Skatepark.WALL_H - 0.8)
 
 	_shake = move_toward(_shake, 0.0, delta * 0.25)
 	_dip = lerpf(_dip, 0.0, 1.0 - exp(-delta * 8.0))

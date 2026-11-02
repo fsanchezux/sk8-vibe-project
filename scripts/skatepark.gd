@@ -1,13 +1,14 @@
 class_name Skatepark
 extends Node3D
 ## Recorrido lineal de oeste a este que baja DECK_H en total:
-##  - Oeste: roll-in de salida y deck alto (aquí llegará la carretera).
+##  - Antes, la carretera de bajada con curvas (DownhillRoad), que llega al roll-in.
+##  - Oeste: roll-in de salida y deck alto.
 ##  - Tres carriles bajando del deck: 1 (norte) gap con launcher y rampa de caída,
 ##    2 (centro) un set de 15 escalones con hubba a cada lado y barandilla en medio,
 ##    3 (sur) bank de bajada, kicker y container con un cono encima.
-##  - Este: quarters alineados con los carriles 1 y 3 para hacer el recorrido a la
-##    inversa; en el centro, olas y una rampa enorme que te sacan del mapa por una abertura
-##    del murete: al salir vuelves al principio sin perder velocidad (EXIT_X).
+##  - Este: los tres carriles acaban en una lanzadera enorme que te saca del mapa por
+##    una abertura del murete (en el centro, antes, dos olas): al salir vuelves al
+##    principio cayendo desde el aire, sin perder velocidad (EXIT_X).
 ## Al aire libre y en estilo low-poly minimalista (caras planas, paleta cálida de
 ## atardecer); el entorno está en Scenery.
 ##
@@ -17,12 +18,14 @@ extends Node3D
 
 const HALF_X := 28.0
 const HALF_Z := 17.0
-## Techo para la cámara (el park está al aire libre).
-const WALL_H := 16.0
+## Techo para la cámara (el park está al aire libre; la carretera llega a ~15 m).
+const WALL_H := 30.0
 ## Altura del deck de salida sobre el fondo del park (un set de 15 escalones de 16 cm).
 const DECK_H := 2.4
-## Altura del roll-in de salida sobre el deck (da la velocidad para los saltos).
-const ROLL_IN_H := 4.5
+## Roll-in de entrada al park: altura sobre el deck y largo. Suave: la velocidad ya la
+## trae la carretera.
+const ROLL_IN_H := 0.9
+const ROLL_IN_L := 3.0
 ## x donde acaba el deck de los carriles 1 y 3 (la escalera empieza en -13).
 const LANE_START := -10.0
 ## Carril 1: césped entre el labio de la lanzadera y la rampa de recepción.
@@ -30,8 +33,10 @@ const GAP_LENGTH := 6.0
 ## Curva de lanzadera de los banks (1 = recto). Las de recepción del gap, más marcada.
 const BANK_KICK := 1.3
 const GAP_KICK := 1.8
-## Carril 2: altura de las hubbas y de la barandilla sobre la línea de los escalones.
-const HUBBA_H := 0.9
+## Carril 2: altura y ancho de las hubbas y altura de la barandilla sobre la línea de
+## los escalones.
+const HUBBA_H := 1.2
+const HUBBA_W := 1.0
 const RAIL_H := 1.1
 ## Carril 3: distancia del final del ledge al contenedor de basura.
 const BIN_GAP := 3.5
@@ -39,15 +44,18 @@ const BIN_GAP := 3.5
 const BIG_RAMP_L := 9.0
 const BIG_RAMP_H := 4.0
 ## Olas del centro, justo antes de la rampa final. Largas para que con esta altura
-## las pendientes no pasen de ~40°.
+## las pendientes no pasen de ~40°. La primera, más baja (WAVE_FIRST de la altura).
 const WAVE_L := 18.0
-const WAVE_H := 2.4
+const WAVE_H := 2.1
 const WAVE_N := 2
+const WAVE_FIRST := 2.0 / 3.0
 ## Carriles (z): 1 al norte, 2 en el centro, 3 al sur.
 const LANE_Z := [-11.25, 0.0, 11.25]
 const LANE_EDGE := 5.5
-## Abertura del murete este por la que se sale del mapa (media anchura en z).
+## Aberturas del murete este por las que se sale del mapa (media anchura en z): la del
+## centro y las de los carriles 1 y 3, cada una con su lanzadera.
 const EXIT_HALF_W := 4.5
+const SIDE_EXIT_HALF_W := 4.75
 ## Al pasar de aquí en x se vuelve al principio del recorrido.
 const EXIT_X := HALF_X + 1.5
 ## Altura "infinita" fuera del park: el murete perimetral funciona como pared.
@@ -77,9 +85,14 @@ var shapes: Array[Dictionary] = []
 ## Zonas grindables: {a: Vector3, b: Vector3, kind: "rail" | "ledge" | "coping"}.
 ## a y b son la línea sobre la que se apoya la tabla.
 var rails: Array[Dictionary] = []
-## Salida: arriba del roll-in, mirando al este (+x).
+## Salida: arriba del roll-in, mirando al este (+x). La carretera la mueve a su inicio.
 var spawn_pos := Vector3(-27.2, 0.0, 0.0)
 var spawn_yaw := -PI * 0.5
+## Carretera de bajada al oeste del park (fuera de HALF_X); su suelo lo da ella.
+var road: DownhillRoad
+## Física por capas (puente): las formas con "layer" solo existen para quien está a su
+## altura o por encima. El skater pone aquí su altura en cada paso; INF = todo.
+var probe_y := INF
 ## Decoración con malla propia (container, cono, matorrales y césped del gap).
 var _containers: Array[Dictionary] = []
 var _cones: Array[Vector3] = []
@@ -101,11 +114,15 @@ func _ready() -> void:
 
 ## Altura del suelo y su gradiente en (x, z): Vector3(h, dh/dx, dh/dz).
 func sample(x: float, z: float) -> Vector3:
-	if absf(x) > HALF_X or absf(z) > HALF_Z:
-		if not in_exit(x, z):
-			return Vector3(OUT_H, 0.0, 0.0)
 	var best := Vector3.ZERO
+	if absf(x) > HALF_X or absf(z) > HALF_Z:
+		if road and road.contains(x, z):
+			best = road.ground(x, z)
+		elif not in_exit(x, z):
+			return Vector3(OUT_H, 0.0, 0.0)
 	for s in shapes:
+		if _hidden_layer(s):
+			continue
 		var r := _sample_shape(s, x, z)
 		if r.x > best.x:
 			best = r
@@ -127,11 +144,25 @@ func kind_at(x: float, z: float) -> String:
 	var best := 0.0
 	var kind := ""
 	for s in shapes:
+		if _hidden_layer(s):
+			continue
 		var r := _sample_shape(s, x, z)
 		if r.x > best:
 			best = r.x
 			kind = s["type"]
 	return kind
+
+
+## Forma de una capa superior (tablero del puente) que no cuenta para quien va por debajo.
+func _hidden_layer(s: Dictionary) -> bool:
+	return s.has("layer") and probe_y < float(s["layer"]) - 0.3
+
+
+## Césped de la carretera: frena (ver Skater.GRASS_SPEED).
+func is_grass(x: float, z: float) -> bool:
+	if absf(x) <= HALF_X or road == null or not road.contains(x, z):
+		return false
+	return kind_at(x, z) == "" and road.is_grass(x, z)
 
 
 ## Quarters, olas y rampas: ahí el skater hace pump al bajar (ver Skater.PUMP_ACCEL).
@@ -140,14 +171,20 @@ func is_pump_zone(x: float, z: float) -> bool:
 	return kind == "qp" or kind == "wave" or kind == "bank"
 
 
-## Rampa final del centro: subiéndola no se frena y empuja (ver Skater.BOOST_SPEED).
+## Lanzaderas finales: subiéndolas no se frena y empujan (ver Skater.BOOST_SPEED).
 func is_booster(x: float, z: float) -> bool:
-	return x > HALF_X - 0.1 - BIG_RAMP_L and x <= HALF_X and absf(z) < EXIT_HALF_W
+	return x > HALF_X - 0.1 - BIG_RAMP_L and x <= HALF_X and exit_lane(z)
+
+
+## ¿Está z frente a una de las aberturas del murete este (centro o carriles 1 y 3)?
+static func exit_lane(z: float) -> bool:
+	var side: float = LANE_Z[2]
+	return absf(z) < EXIT_HALF_W or absf(absf(z) - side) < SIDE_EXIT_HALF_W
 
 
 ## Pasillo de salida tras la abertura del murete este (suelo a 0 hasta EXIT_X y algo más).
 func in_exit(x: float, z: float) -> bool:
-	return x > HALF_X and x < EXIT_X + 6.0 and absf(z) < EXIT_HALF_W
+	return x > HALF_X and x < EXIT_X + 6.0 and exit_lane(z)
 
 
 func _sample_shape(s: Dictionary, x: float, z: float) -> Vector3:
@@ -208,6 +245,8 @@ func _sample_shape(s: Dictionary, x: float, z: float) -> Vector3:
 			if t > 0.0 and t < lw:
 				var k := TAU * float(s["n"]) / lw
 				var ch: float = s["h"]
+				if t < lw / float(s["n"]):
+					ch *= float(s.get("first", 1.0))
 				h = ch * 0.5 * (1.0 - cos(k * t))
 				du = ch * 0.5 * k * sin(k * t)
 	# y0: altura de la base (piezas encima del deck o de un rellano)
@@ -227,7 +266,7 @@ func _define_layout() -> void:
 	_box(Vector2(-28.0, -17.0), Vector2(-13.0, 17.0), DECK_H, C_CONCRETE, C_CONCRETE_DARK, true)
 	_box(Vector2(-13.0, -17.0), Vector2(LANE_START, -e), DECK_H, C_CONCRETE, C_CONCRETE_DARK, true)
 	_box(Vector2(-13.0, e), Vector2(LANE_START, 17.0), DECK_H, C_CONCRETE, C_CONCRETE_DARK, true)
-	_bank(Vector2(-20.5, 0.0), Vector2(-1, 0), 34.0, ROLL_IN_H, 6.0, 1.5, C_WOOD_SIDE, DECK_H)
+	_bank(Vector2(-26.5 + ROLL_IN_L, 0.0), Vector2(-1, 0), 34.0, ROLL_IN_H, ROLL_IN_L, 1.5, C_WOOD_SIDE, DECK_H)
 
 	# Carril 1 (norte): lanzadera larga al borde del deck, hueco de césped a ras de suelo
 	# y rampa de recepción donde acaba el césped. Si te quedas corto caes al césped, que
@@ -243,11 +282,11 @@ func _define_layout() -> void:
 
 	# Carril 2 (centro): un set de 15 escalones (DECK_H) con hubba a cada lado y
 	# barandilla en medio.
-	var stair_w := 2.0 * e - 1.2
+	var stair_w := 2.0 * (e - HUBBA_W)
 	_stairs(Vector2(-8.5, 0.0), Vector2(-1, 0), stair_w, DECK_H, 4.5, 15)
 	# Altas para que al saltar desde el deck la tabla baje hasta ellas y enganche el grind.
 	for sz in [-1.0, 1.0]:
-		_hubba(Vector2(-13.0, sz * (e - 0.3)), 4.5, DECK_H + HUBBA_H, HUBBA_H)
+		_hubba(Vector2(-13.0, sz * (e - HUBBA_W * 0.5)), 4.5, DECK_H + HUBBA_H, HUBBA_H)
 	_rail(Vector3(-12.8, DECK_H - 0.1 + RAIL_H, 0.0), Vector3(-8.7, 0.16 + RAIL_H, 0.0), "rail")
 
 	# Carril 3 (sur): bank de bajada del deck y ledge sobre arco que hace de lanzadera
@@ -264,18 +303,23 @@ func _define_layout() -> void:
 	_container(Vector2(bin_x, z3 - 1.0), Vector2(bin_x + 1.2, z3 + 1.0), 1.2)
 	_cone_on(Vector3(bin_x + 0.6, 1.2, z3))
 
-	# Este: quarters al final de los carriles 1 y 3 para volver a la inversa.
-	_qp(Vector2(23.5, z1), Vector2(1, 0), 11.0, 2.6, 1.1, C_SLATE)
-	_qp(Vector2(23.5, z3), Vector2(1, 0), 11.0, 2.6, 1.1, C_SLATE)
-	# En el centro, olas y una rampa enorme que acaba en la abertura del murete y te
-	# lanza fuera del mapa (subirla no frena, ver is_booster).
+	# Este: los tres carriles acaban en una lanzadera enorme que llega a su abertura del
+	# murete y te lanza fuera del mapa (subirla no frena, ver is_booster).
+	for lz in [z1, z3]:
+		_add_module(_wedge(BIG_RAMP_L, BIG_RAMP_H, 2.0 * SIDE_EXIT_HALF_W), Vector3(HALF_X - 0.1 - BIG_RAMP_L, 0.0, lz))
+	# En el centro, antes de la lanzadera, las olas.
 	var wave := ParkWave.new()
 	wave.length = WAVE_L
 	wave.crest_height = WAVE_H
 	wave.crests = WAVE_N
+	wave.first_scale = WAVE_FIRST
 	wave.width = 2.0 * EXIT_HALF_W
 	_add_module(wave, Vector3(HALF_X - 0.1 - BIG_RAMP_L - WAVE_L, 0.0, 0.0))
 	_add_module(_wedge(BIG_RAMP_L, BIG_RAMP_H, 2.0 * EXIT_HALF_W), Vector3(HALF_X - 0.1 - BIG_RAMP_L, 0.0, 0.0))
+
+	# Carretera de bajada con curvas al oeste: empieza ahí y llega al roll-in.
+	road = DownhillRoad.new()
+	_add_module(road, Vector3.ZERO)
 
 	# Módulos colocados a mano en el editor (ParkModule): suman su física y rails.
 	for m in modules:
@@ -299,7 +343,7 @@ func _add_module(m: ParkModule, pos: Vector3) -> void:
 
 ## Hubba: ledge inclinado junto a una escalera, de h0 a h1 a lo largo de +x.
 func _hubba(start: Vector2, length: float, h0: float, h1: float) -> void:
-	shapes.append({"type": "slope", "o": start, "dir": Vector2(1, 0), "w": 0.6, "len": length,
+	shapes.append({"type": "slope", "o": start, "dir": Vector2(1, 0), "w": HUBBA_W, "len": length,
 		"h0": h0, "h1": h1})
 	_rail(Vector3(start.x, h0, start.y), Vector3(start.x + length, h1, start.y), "ledge")
 
@@ -430,8 +474,9 @@ func _perimeter() -> void:
 	while z < HALF_Z - 0.01:
 		var z1 := minf(z + step, HALF_Z)
 		var zm := (z + z1) * 0.5
-		_cuboid(Vector3(-HALF_X - t, 0.0, z), Vector3(-HALF_X, _wall_top(-HALF_X + 0.2, zm), z1), C_CONCRETE_DARK)
-		if absf(zm) > EXIT_HALF_W:
+		if road == null or zm < road.open_z0 or zm > road.open_z1:
+			_cuboid(Vector3(-HALF_X - t, 0.0, z), Vector3(-HALF_X, _wall_top(-HALF_X + 0.2, zm), z1), C_CONCRETE_DARK)
+		if not exit_lane(zm):
 			_cuboid(Vector3(HALF_X, 0.0, z), Vector3(HALF_X + t, _wall_top(HALF_X - 0.2, zm), z1), C_CONCRETE_DARK)
 		z = z1
 
@@ -612,6 +657,8 @@ func _mesh_bank(s: Dictionary) -> void:
 	var side: Color = s["side"]
 	var k: float = s.get("k", 1.0)
 	var hw := w * 0.5
+	# skirt: los laterales bajan más allá de la base (rampas sobre la ladera de la carretera)
+	var b0 := -float(s.get("skirt", 0.0))
 	var surf := C_CORAL.lightened(0.15) if side == C_CORAL else C_WOOD
 	var right := _ld(s, 0.0, 1.0, 0.0)
 	var fwd := _ld(s, 1.0, 0.0, 0.0)
@@ -630,17 +677,17 @@ func _mesh_bank(s: Dictionary) -> void:
 			n = -n
 		_quad(a, b, _lp(s, u1, hw, y1), d, n, surf)
 		for sv in [-1.0, 1.0]:
-			_quad(_lp(s, u0, hw * sv, 0.0), _lp(s, u1, hw * sv, 0.0), _lp(s, u1, hw * sv, y1),
+			_quad(_lp(s, u0, hw * sv, b0), _lp(s, u1, hw * sv, b0), _lp(s, u1, hw * sv, y1),
 				_lp(s, u0, hw * sv, y0), right * sv, side)
 	for sv in [-1.0, 1.0]:
 		var sn: Vector3 = right * sv
-		var p1 := _lp(s, bl, hw * sv, 0.0)
+		var p1 := _lp(s, bl, hw * sv, b0)
 		var p2 := _lp(s, bl, hw * sv, h)
 		if length > bl:
-			_quad(p1, _lp(s, length, hw * sv, 0.0), _lp(s, length, hw * sv, h), p2, sn, side)
+			_quad(p1, _lp(s, length, hw * sv, b0), _lp(s, length, hw * sv, h), p2, sn, side)
 	if length > bl:
 		_quad(_lp(s, bl, -hw, h), _lp(s, length, -hw, h), _lp(s, length, hw, h), _lp(s, bl, hw, h), Vector3.UP, C_WOOD)
-	_quad(_lp(s, length, -hw, 0.0), _lp(s, length, hw, 0.0), _lp(s, length, hw, h), _lp(s, length, -hw, h), fwd, side.darkened(0.15))
+	_quad(_lp(s, length, -hw, b0), _lp(s, length, hw, b0), _lp(s, length, hw, h), _lp(s, length, -hw, h), fwd, side.darkened(0.15))
 
 
 func _mesh_stairs(s: Dictionary) -> void:

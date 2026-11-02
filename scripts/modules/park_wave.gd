@@ -27,6 +27,11 @@ const C_PLATE := Color(0.08, 0.08, 0.1)
 	set(v):
 		crests = v
 		queue_rebuild()
+## Altura de la primera cresta respecto a las demás (1 = todas iguales).
+@export_range(0.1, 1.0) var first_scale := 1.0:
+	set(v):
+		first_scale = v
+		queue_rebuild()
 ## Tramo plano al principio y al final.
 @export var flat_end := 0.5:
 	set(v):
@@ -44,7 +49,8 @@ func _height(u: float) -> float:
 	var t := u - flat_end
 	if lw <= 0.0 or t <= 0.0 or t >= lw:
 		return 0.0
-	return crest_height * 0.5 * (1.0 - cos(TAU * crests * t / lw))
+	var ch := crest_height * (first_scale if t < lw / crests else 1.0)
+	return ch * 0.5 * (1.0 - cos(TAU * crests * t / lw))
 
 
 func _build() -> void:
@@ -80,4 +86,4 @@ func _build() -> void:
 
 func register(park: Object) -> void:
 	park.shapes.append({"type": "wave", "o": _origin(), "dir": _dir(), "w": width, "len": length,
-		"h": crest_height, "n": crests, "flat": flat_end, "y0": global_position.y, "nomesh": true})
+		"h": crest_height, "n": crests, "flat": flat_end, "first": first_scale, "y0": global_position.y, "nomesh": true})

@@ -54,7 +54,10 @@ func ground_at(x: float, z: float) -> float:
 	return (_noise.get_noise_2d(x, z) * 6.0 + d * 0.06) * k - 0.02
 
 
+## Park o carretera (DownhillRoad): ahí no va terreno, árboles ni rocas.
 func _in_park(x: float, z: float, margin: float) -> bool:
+	if DownhillRoad.covers(x, z, margin):
+		return true
 	return absf(x) < Skatepark.HALF_X + margin and absf(z) < Skatepark.HALF_Z + margin
 
 
@@ -182,6 +185,8 @@ func _lamps() -> void:
 		Vector3(-12, 0, 18.5), Vector3(14, 0, 18.5), Vector3(-12, 0, -18.5), Vector3(14, 0, -18.5)]
 	for p in spots:
 		var base: Vector3 = p
+		if DownhillRoad.covers(base.x, base.z, 0.0):
+			continue
 		base.y = ground_at(base.x, base.z)
 		_prism(base, base + Vector3(0, 4.2, 0), 0.08, 5, C_LAMP)
 		_prism(base + Vector3(0, 4.15, 0), base + Vector3(0, 4.55, 0), 0.22, 5, C_LAMP)

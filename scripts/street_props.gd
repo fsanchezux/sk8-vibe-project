@@ -116,7 +116,6 @@ func _place_decals() -> void:
 	var gap_land_n := Vector3(2.0 / 8.0, 1.0, 0.0).normalized()
 	var drop_bank_n := Vector3(Skatepark.DECK_H / 7.0, 1.0, 0.0).normalized()
 	var box_land_n := Vector3(1.2 / 5.0, 1.0, 0.0).normalized()
-	var qp_n := Vector3(-0.59, 1.0, 0.0).normalized()
 	var z1: float = Skatepark.LANE_Z[0]
 	var z3: float = Skatepark.LANE_Z[2]
 	var dh := Skatepark.DECK_H
@@ -126,8 +125,6 @@ func _place_decals() -> void:
 		[Vector3(0.0, 1.12, z1), gap_land_n, 3.0, 1.5],
 		[Vector3(-6.5, 1.2, z3), drop_bank_n, 3.0, 1.5],
 		[Vector3(14.0, 0.5, z3), box_land_n, 2.4, 1.2],
-		[Vector3(25.2, 0.6, z1), qp_n, 2.6, 1.3],
-		[Vector3(25.2, 0.6, z3), qp_n, 2.6, 1.3],
 		[Vector3(8.48, 0.6, z3), Vector3.LEFT, 1.6, 0.8],
 				[Vector3(12.0, 0.35, 16.99), Vector3.FORWARD, 2.0, 0.7],
 		[Vector3(12.0, 0.35, -16.99), Vector3.BACK, 2.0, 0.7],
@@ -137,7 +134,7 @@ func _place_decals() -> void:
 		[Vector3(-7.2, 0.0, 0.0), up, 1.6, 1.0],
 		# mobiliario
 		[Vector3(-19.0, dh + 0.55, 15.27), Vector3.FORWARD, 1.6, 0.8],
-		[Vector3(21.5, 0.5, -15.85), Vector3.BACK, 0.55, 0.45],
+		[Vector3(14.5, 0.5, -16.05), Vector3.BACK, 0.55, 0.45],
 	]
 	for i in spots.size():
 		var s: Array = spots[i]
@@ -168,8 +165,9 @@ func _build_props() -> void:
 	_st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var dh := Skatepark.DECK_H
 	_dumpster(Vector3(-19.0, dh, 15.8), 0.0)
-	_bin(Vector3(21.5, 0.0, -16.2))
-	_bin(Vector3(22.3, 0.0, -16.1))
+	# Antes de la lanzadera del carril 1 (no encima)
+	_bin(Vector3(14.5, 0.0, -16.4))
+	_bin(Vector3(15.3, 0.0, -16.3))
 	for p in [Vector3(7.0, 0, 5.0), Vector3(12.0, 0, -5.0), Vector3(17.0, 0, 5.0), Vector3(-12.0, dh, -6.0)]:
 		_cone(p)
 	_sign(Vector3(22.8, 0.0, 16.4))

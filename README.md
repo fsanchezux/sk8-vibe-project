@@ -22,6 +22,7 @@ no la respeten no se aceptarán.
 ## Controles (táctil)
 
 - **Mitad izquierda**: stick flotante de movimiento lateral. Doble toque = grab.
+  Stick hacia abajo = frenar derrapando (levanta el morro y arrastra el tail).
 - **Mitad derecha**: flick hacia arriba o toque para empujar; flicks para trucos.
   Cuanto más largo es el recorrido del flick (de abajo del todo a arriba del todo),
   más alto es el salto. El trazo del dedo se queda dibujado hasta que cae el truco.
@@ -34,34 +35,45 @@ no la respeten no se aceptarán.
   Espacio = ollie, W = empujar, K = grab, F = fijar spot, R = volver al spot.
   Mayús mantenido = pop suave (el teclado no mide recorrido).
 - Mando: stick derecho = trucos (misma intensidad por recorrido que en táctil),
+  stick izquierdo abajo o X = frenar,
   Back/Select = fijar spot, Y = volver al spot.
 
 ## El recorrido
 
-Empiezas arriba de un roll-in en el deck oeste y bajas hacia el este por uno de tres
-carriles (el park baja 2,4 m en total). Los carriles 1 y 3 empiezan 3 m más tarde que
+Empiezas arriba de una carretera de bajada con curvas (serpentina, 3,5 % de pendiente)
+que llega al roll-in del deck oeste del park. A los lados hay césped, un poco más bajo
+que el asfalto: puedes salirte, pero vas a la mitad de velocidad. Una línea recta de atajos cruza las curvas:
+
+- **Atajos 1 y 2:** kicker al borde de un tramo, hueco de césped y rampa de recepción
+  en el tramo siguiente. Te ahorras la curva. Todas las rampas de la carretera tienen
+  un poco de lanzadera (los kickers, más).
+- **Atajo 3, el puente:** rampa de subida, puente por encima del tramo siguiente (si vas
+  por la carretera pasas por debajo) y una rampa larga que baja directa al roll-in.
+
+Del roll-in bajas hacia el este por uno de tres carriles (el park baja 2,4 m en total). Los carriles 1 y 3 empiezan 3 m más tarde que
 la escalera, para que dé tiempo a colocarse:
 
 1. **Norte, gap:** lanzadera larga al borde del deck, 6 m de césped y rampa de recepción,
    que también es lanzadera para hacer el gap a la inversa.
-2. **Centro, escaleras:** un set de 15 escalones con hubba a cada lado (0,9 m sobre los
-   escalones) y barandilla en medio (1,1 m), altas para poder grindarlas al saltar del deck.
+2. **Centro, escaleras:** un set de 15 escalones con hubba a cada lado (1,2 m sobre los
+   escalones y 1 m de ancho) y barandilla en medio (1,1 m), altas para poder grindarlas al saltar del deck.
 3. **Sur, basura:** bank de bajada y un ledge sobre arco ancho (1,6 m) que hace de lanzadera (súbelo
    rodando o grindando) para saltar un contenedor de basura con un cono encima, algo
    lejos: hace falta un buen ollie. Tocar el cono es caer.
 
-Al fondo hay dos quarters, alineados con los carriles 1 y 3, para volver a hacer el
-recorrido a la inversa. En el centro, dos olas de 2,4 m pegadas a una rampa enorme (4 m)
-te sacan por la abertura del murete. Subirla no frena: te empuja y te lanza fuera
-aunque llegues despacio. Al salir del mapa vuelves al principio con la misma velocidad.
+Los tres carriles acaban en una lanzadera enorme (4 m) que te saca del mapa por una
+abertura del murete; en el centro, antes, hay dos olas (la primera de 1,4 m y la
+segunda de 2,1 m). Subir las lanzaderas no frena: te empujan y te lanzan fuera aunque
+llegues despacio. Al salir del mapa vuelves arriba de la carretera con la misma
+velocidad: apareces en el aire y caes sobre la salida, como si vinieras de la rampa.
 
-En los quarters, las olas y las rampas el skater hace pump solo: se agacha al bajar,
-se estira al subir y gana velocidad (`PUMP_ACCEL` en `scripts/skater.gd`).
+En las olas y las rampas el skater hace pump solo: se agacha al bajar,
+se estira al subir y gana velocidad (`PUMP_ACCEL` en `scripts/skater.gd`). Y en el aire,
+al caer sobre una rampa u ola, se va inclinando hacia ella antes de tocarla (transfer)
+para entrar suave (`TRANSFER_TIME`).
 
 Todas las rampas rectas tienen un poco de curva de lanzadera al final (más empinadas
 arriba); la de recepción del gap, más marcada (`BANK_KICK` y `GAP_KICK`).
-
-Más adelante, la salida será una carretera de bajada con curvas que llega al deck.
 
 ## Módulos del mapa
 
@@ -72,6 +84,7 @@ Piezas sueltas que se colocan a mano en el editor de Godot (`scripts/modules/`):
 | `ParkWave` | Ola de hormigón de varias crestas (VAG-3) | no |
 | `ParkWedge` | Cuña curva de hormigón con canto vivo | canto trasero |
 | `ParkArchLedge` | Ledge inclinado sobre un arco | cara superior |
+| `DownhillRoad` | La carretera de salida (la coloca el park, no se mueve a mano) | no |
 
 Para usarlos: abre `scenes/main.tscn`, selecciona el nodo `Modules` y añade un nodo
 `Node3D` con el script del módulo (o duplica uno de los de ejemplo). Muévelo en X/Z y

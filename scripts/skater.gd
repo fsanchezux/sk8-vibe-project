@@ -182,10 +182,29 @@ var _prev_tail := Vector3.ZERO
 var _pop_power := 1.0
 ## Cuánto está agachado por el pump (0..1).
 var _pump_k := 0.0
+## Transfer: inclinación de la superficie donde va a caer (en el aire, bajando).
+var _land_up := Vector3.UP
+var _land_k := 0.0
+## Este vuelo es la llegada al inicio (no da puntos de "Big Air").
+var _arriving := false
+## Velocidad al entrar al césped (-1 = no estamos en él).
+var _grass_entry := -1.0
 var skid_marks: SkidMarks
 
 ## Pump en quarters, olas y rampas: aceleración extra bajando (× seno de la pendiente).
 const PUMP_ACCEL := 6.0
+
+## Césped de la carretera: frena hasta GRASS_SPEED de la velocidad con que entraste
+## (la mitad), con esta deceleración (m/s²).
+const GRASS_SPEED := 0.5
+const GRASS_DECEL := 8.0
+## Al volver al inicio tras salir por una lanzadera: aparece en el aire, ARRIVE_H por
+## encima de la salida y aún subiendo un poco, y cae a la carretera como si saliera de
+## la rampa.
+const ARRIVE_H := 5.0
+const ARRIVE_UP := 2.0
+## Transfer: con cuánta antelación (s) empieza a inclinarse hacia la rampa donde va a caer.
+const TRANSFER_TIME := 0.45
 
 ## Rampa final (Skatepark.is_booster): velocidad a la que te empuja y con qué aceleración.
 const BOOST_SPEED := 14.0
@@ -222,6 +241,8 @@ func celebrate(level: int) -> void:
 func reset_skater(pos := Vector3.ZERO, yaw := 0.0) -> void:
 	position = pos
 	if park:
+		# Por capas: aparece sobre la superficie a su altura (encima o debajo del puente)
+		park.probe_y = pos.y + 0.5
 		position.y = park.height_at(pos.x, pos.z)
 	heading = yaw
 	cam_heading = yaw
@@ -240,6 +261,7 @@ func reset_skater(pos := Vector3.ZERO, yaw := 0.0) -> void:
 	_push_queued = false
 	_crouch = 0.0
 	_pump_k = 0.0
+	_grass_entry = -1.0
 	_lean = 0.0
 	_trick = {}
 	_grab_id = ""
@@ -285,6 +307,10 @@ func _physics_process(delta: float) -> void:
 		_read_right()
 		flick.update()
 	_grind_cool = maxf(_grind_cool - delta, 0.0)
+	# Física por capas: el park ignora lo que está por encima (tablero del puente si
+	# pasamos por debajo).
+	if park:
+		park.probe_y = position.y
 	match state:
 		State.RIDING:
 			_ride(delta, move)
@@ -364,9 +390,10 @@ func _ride(delta: float, move: Vector2) -> void:
 
 	# Móvil: mantener el dedo en el stick izquierdo (o llevarlo hacia delante) empuja
 	# sin parar; también W mantenida y A en el mando.
-	# Freno: S en el teclado, X en el mando o llevar el stick izquierdo hacia atrás.
+	# Freno (FSA-206): S en el teclado, X en el mando o llevar el stick izquierdo (táctil o
+	# del mando) hacia abajo.
 	# Levanta el morro y arrastra el tail (se oye y deja marca).
-	_braking = _kb_brake() or (input_enabled and touch != null and touch.left_vector.y > 0.55)
+	_braking = _kb_brake() or (input_enabled and touch != null and touch.left_vector.y > 0.55) 		or (input_enabled and _pad_stick(JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y).y > 0.55)
 	if input_enabled and touch and not _braking and (touch.left_held() or touch.left_vector.y < -0.5):
 		_push_queued = true
 	if _braking:
@@ -391,6 +418,12 @@ func _ride(delta: float, move: Vector2) -> void:
 	else:
 		speed -= gravity * f.y * delta
 	speed = move_toward(speed, 0.0, (rolling_friction + air_drag * speed * speed) * delta)
+	if park.is_grass(position.x, position.z):
+		if _grass_entry < 0.0:
+			_grass_entry = speed
+		speed = move_toward(speed, minf(speed, _grass_entry * GRASS_SPEED), GRASS_DECEL * delta)
+	else:
+		_grass_entry = -1.0
 	speed = clampf(speed, -max_speed, max_speed)
 
 	# Si la tabla se va hacia atrás (se para subiendo una rampa) hace un revert solo.
@@ -674,6 +707,7 @@ func _trick_points() -> int:
 
 func _enter_air(v: Vector3) -> void:
 	state = State.AIR
+	_arriving = false
 	_revert_t = -1.0
 	vel = v
 	_air_t = 0.0
@@ -731,6 +765,7 @@ func _air(delta: float, move: Vector2) -> void:
 	_lean = lerpf(_lean, 0.0, 1.0 - exp(-delta * 4.0))
 	_crouch = move_toward(_crouch, 0.0, delta * 4.0)
 	_advance_board(delta)
+	_predict_landing()
 
 	# Gravedad algo menor cerca del punto más alto (flotar un instante al planchar).
 	var hang := lerpf(apex_hang, 1.0, clampf(absf(vel.y) / 2.2, 0.0, 1.0))
@@ -752,6 +787,30 @@ func _air(delta: float, move: Vector2) -> void:
 	if _air_t > 0.05 and position.y <= s1.x:
 		position.y = s1.x
 		_land(s1)
+
+
+## Transfer: bajando, sigue la parábola hasta el suelo y, si cae en una rampa (olas,
+## quarters, banks), se va inclinando hacia ella para entrar suave. Subiendo no hace
+## nada: al salir de una lanzadera el cuerpo se endereza como siempre.
+func _predict_landing() -> void:
+	_land_k = 0.0
+	if vel.y >= 0.0:
+		return
+	var p := position
+	var v := vel
+	var dt := 0.03
+	var t := 0.0
+	while t < TRANSFER_TIME:
+		t += dt
+		v.y -= gravity * dt
+		p += v * dt
+		var s := park.sample(p.x, p.z)
+		if p.y <= s.x:
+			var n := Vector3(-s.y, 1.0, -s.z).normalized()
+			if n.y < 0.97:
+				_land_up = n
+				_land_k = 1.0 - t / TRANSFER_TIME
+			return
 
 
 func _update_grab(delta: float, move: Vector2) -> void:
@@ -827,7 +886,8 @@ func _land(s: Vector3) -> void:
 	audio.land(0.3 + hit * 0.7)
 	impact.emit(0.2 + hit * 0.8)
 	model.set_trick_rotation(0.0, 0.0)
-	_emit_air_tricks(true)
+	_emit_air_tricks(not _arriving)
+	_arriving = false
 	_trick = {}
 	if reverting:
 		_start_revert(diff, true)
@@ -1031,13 +1091,18 @@ func go_to_spot() -> void:
 	_fade = 0.0
 
 
-## Vuelve al principio del recorrido sin perder velocidad (al salir del mapa por el este).
+## Vuelve al principio del recorrido sin perder velocidad (al salir del mapa por el este):
+## llega por el aire y cae sobre la salida, como al salir de una rampa.
 func teleport_to(pos: Vector3, yaw: float) -> void:
 	var keep := Vector2(vel.x, vel.z).length() if state == State.AIR else current_speed()
 	if state == State.BAIL:
 		keep = 0.0
 	reset_skater(pos, yaw)
-	speed = minf(keep, max_speed)
+	keep = minf(keep, max_speed)
+	position.y += ARRIVE_H
+	_enter_air(_forward(yaw) * keep + Vector3.UP * ARRIVE_UP)
+	_arriving = true
+	reset_physics_interpolation()
 
 
 func spot_position() -> Vector3:
@@ -1056,12 +1121,13 @@ func _remember_safe_spot(delta: float) -> void:
 		return
 	_safe_t = 0.0
 	var p := position
-	if absf(p.x) > Skatepark.HALF_X - 1.5 or absf(p.z) > Skatepark.HALF_Z - 1.5:
-		return
 	var h := park.height_at(p.x, p.z)
+	# Lejos de paredes (1,5 m) y casi llano (la carretera tiene un 3,5 % de pendiente)
 	for o in [Vector2(0.9, 0), Vector2(-0.9, 0), Vector2(0, 0.9), Vector2(0, -0.9)]:
 		var d: Vector2 = o
-		if absf(park.height_at(p.x + d.x, p.z + d.y) - h) > 0.02:
+		if absf(park.height_at(p.x + d.x, p.z + d.y) - h) > 0.04:
+			return
+		if absf(park.height_at(p.x + d.x * 1.7, p.z + d.y * 1.7) - h) > 1.0:
 			return
 	_safe_pos = Vector3(p.x, h, p.z)
 	_safe_yaw = heading
@@ -1233,7 +1299,11 @@ func _consume_grab_edge() -> bool:
 
 func _update_transform(delta: float) -> void:
 	var target_up := _ground_n if state == State.RIDING else Vector3.UP
-	var k := 1.0 - exp(-delta * (14.0 if state == State.RIDING else 3.0))
+	var rate := 14.0 if state == State.RIDING else 3.0
+	if state == State.AIR and _land_k > 0.0:
+		target_up = Vector3.UP.lerp(_land_up, clampf(_land_k * 1.6, 0.0, 1.0)).normalized()
+		rate = 9.0
+	var k := 1.0 - exp(-delta * rate)
 	_up = _up.lerp(target_up, k).normalized()
 	var fwd := _forward(heading + _yaw_offset)
 	var z := -(fwd - _up * fwd.dot(_up)).normalized()
