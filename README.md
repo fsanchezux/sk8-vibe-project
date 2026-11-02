@@ -22,7 +22,8 @@ no la respeten no se aceptarán.
 ## Controles (táctil)
 
 - **Mitad izquierda**: stick flotante de movimiento lateral. Doble toque = grab.
-  Stick hacia abajo = frenar derrapando (levanta el morro y arrastra el tail).
+  Stick hacia abajo = derrape: la tabla se cruza perpendicular a la marcha y frena; al
+  soltar vuelve a ponerse recta y sigues.
 - **Mitad derecha**: flick hacia arriba o toque para empujar; flicks para trucos.
   Cuanto más largo es el recorrido del flick (de abajo del todo a arriba del todo),
   más alto es el salto. El trazo del dedo se queda dibujado hasta que cae el truco.
@@ -42,10 +43,11 @@ no la respeten no se aceptarán.
 
 Empiezas arriba de una carretera de bajada con curvas (serpentina, 3,5 % de pendiente)
 que llega al roll-in del deck oeste del park. A los lados hay césped, un poco más bajo
-que el asfalto: puedes salirte, pero vas a la mitad de velocidad. Una línea recta de atajos cruza las curvas:
+que el asfalto: puedes salirte, pero vas a la mitad de velocidad. Atajos:
 
-- **Atajos 1 y 2:** kicker al borde de un tramo, hueco de césped y rampa de recepción
-  en el tramo siguiente. Te ahorras la curva. Todas las rampas de la carretera tienen
+- **Atajos 1 y 2:** al principio de la primera y la segunda curva, un kicker por dentro
+  de la curva (al entrar ya vas girando hacia él), hueco de césped y rampa de recepción
+  donde sale la curva. Te ahorras la curva. Todas las rampas de la carretera tienen
   un poco de lanzadera (los kickers, más).
 - **Atajo 3, el puente:** rampa de subida, puente por encima del tramo siguiente (si vas
   por la carretera pasas por debajo) y una rampa larga que baja directa al roll-in.

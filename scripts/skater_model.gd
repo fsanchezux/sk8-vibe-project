@@ -183,17 +183,15 @@ func update_pose(delta: float, p: Dictionary) -> void:
 	crouch = clampf(crouch + comp * 0.95, 0.0, 1.25)
 	lift = lerpf(lift, 0.3, gk)
 	pitch = lerpf(pitch, 0.08, gk)
-	# Freno levantando la tabla: morro arriba y el tail arrastrando por el suelo
+	# Derrape (powerslide): la tabla cruzada (eso lo gira el skater) y él agachado,
+	# cargando el peso en los talones contra la marcha.
 	if brake > 0.0:
-		var bk := smoothstep(0.0, 1.0, brake)
-		pitch += 0.34 * bk
-		lift += 0.36 * sin(0.34 * bk) * 0.85
-		crouch = clampf(crouch + bk * 0.35, 0.0, 1.25)
+		crouch = clampf(crouch + smoothstep(0.0, 1.0, brake) * 0.45, 0.0, 1.25)
 	tuck = maxf(tuck, gk)
 
 	# Revert: se agacha y carga el peso atrás (talones) mientras la tabla derrapa
 	crouch = clampf(crouch + revert * 0.4, 0.0, 1.25)
-	lean_root.rotation = Vector3(0.0, 0.0, lean + revert * 0.2)
+	lean_root.rotation = Vector3(0.0, 0.0, lean + revert * 0.2 + brake * 0.25)
 	board_root.position = Vector3(board_x, lift, 0.0)
 	board_root.rotation = Vector3(pitch, 0.0, 0.0)
 
@@ -202,8 +200,7 @@ func update_pose(delta: float, p: Dictionary) -> void:
 	var k := _leg / 0.88
 	var hip_y := DECK_Y + _ankle_h + _leg * lerpf(0.96, 0.5, minf(crouch, 1.0)) \
 		- maxf(crouch - 1.0, 0.0) * 0.2 - (push_s * 0.17 - lift * 0.5 + gk * 0.06 - pop * 0.07 + comp * 0.06) * k
-	# Al frenar la cadera se va hacia el tail (peso atrás)
-	var hip := Vector3(-0.03 - crouch * 0.05 + push_s * 0.04, hip_y, brake * 0.1 - push_s * 0.07)
+	var hip := Vector3(-0.03 - crouch * 0.05 + push_s * 0.04, hip_y, -push_s * 0.07)
 
 	# Pies (sobre la tabla, o separados de ella mientras gira en un flip)
 	var foot_f := Vector3(FOOT_X, DECK_Y + lift + gap + 0.21 * sin(pitch), FRONT_FOOT_Z)
@@ -212,8 +209,6 @@ func update_pose(delta: float, p: Dictionary) -> void:
 	foot_f.z -= gap * 0.25
 	var yaw_f := 0.35
 	var yaw_b := -0.1
-	if brake > 0.0:
-		foot_b.z += brake * 0.09 # pie trasero sobre el tail
 	if push >= 0.0:
 		foot_b = _push_foot(push)
 		foot_f.z = FRONT_FOOT_Z - 0.03

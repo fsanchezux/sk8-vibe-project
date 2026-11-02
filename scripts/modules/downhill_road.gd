@@ -4,12 +4,12 @@ extends ParkModule
 ## empieza siempre y adonde se vuelve al salir del mapa por la rampa final.
 ##
 ## Vista desde arriba: tramos rectos norte-sur unidos por curvas de 180° (serpentina)
-## y, al final, una curva de 90° que entra recta al roll-in. Una línea recta de atajos
-## (z = SHORT_Z) la cruza de oeste a este:
-##  1. y 2. Kicker al salir de un tramo, hueco de césped y rampa de recepción en el
-##     tramo siguiente: te saltas la curva.
-##  3. Puente: rampa de subida, tablero por encima del tramo siguiente (si vas por la
-##     carretera pasas por debajo) y una rampa larga de bajada hasta el roll-in.
+## y, al final, una curva de 90° que entra recta al roll-in. Atajos:
+##  1. y 2. Al principio de la primera y la segunda curva: kicker por dentro de la
+##     curva al final del tramo, hueco de césped y rampa de recepción donde sale la
+##     curva. Como al entrar en la curva ya vas girando hacia él, se encara fácil.
+##  3. Puente (en z = SHORT_Z): rampa de subida, tablero por encima del tramo siguiente
+##     (si vas por la carretera pasas por debajo) y una rampa larga hasta el roll-in.
 ## A los lados, césped liso un poco más bajo que el asfalto: se puede rodar por él, pero
 ## vas a la mitad de velocidad (Skater.GRASS_SPEED).
 ## Todas las rampas tienen algo de curva de lanzadera al final; los kickers, más.
@@ -28,7 +28,7 @@ const LEGS := 5
 const GRADE := 0.035
 ## Recta final hasta el murete del park (x = -Skatepark.HALF_X), en z = 0.
 const FINAL := 6.0
-## Línea de los atajos y ancho de sus rampas.
+## Línea del puente y ancho de las rampas de los atajos.
 const SHORT_Z := 6.0
 const RAMP_W := 4.0
 ## Curva de lanzadera de los kickers de los atajos (las demás rampas usan BANK_KICK).
@@ -148,7 +148,7 @@ func _layout() -> void:
 	# Tablero del puente: sobre el tramo 3, con BRIDGE_CLEAR de altura libre.
 	var x3 := _leg_x[3]
 	_deck = {"x0": x3 - RH - 1.0, "x1": x3 + RH + 1.0, "z0": SHORT_Z - RAMP_W * 0.5,
-		"z1": SHORT_Z + RAMP_W * 0.5, "h": height_at_s(_cross_s(3)) + BRIDGE_CLEAR}
+		"z1": SHORT_Z + RAMP_W * 0.5, "h": height_at_s(_cross_s(3, SHORT_Z)) + BRIDGE_CLEAR}
 
 
 func _line(a: Vector2, b: Vector2) -> void:
@@ -239,13 +239,13 @@ func _grass_h(x: float, z: float) -> float:
 	return _closest_all(Vector2(x, z))["grass"]
 
 
-## s donde el tramo k cruza la línea de atajos.
-func _cross_s(k: int) -> float:
+## s del tramo recto k a la altura z.
+func _cross_s(k: int, z: float) -> float:
 	var x := _leg_x[k]
 	var best := 0.0
 	var best_d := INF
 	for pc in pieces:
-		var r := _closest(pc, Vector2(x, SHORT_Z))
+		var r := _closest(pc, Vector2(x, z))
 		if r[0] < best_d:
 			best_d = r[0]
 			best = r[1]
@@ -256,18 +256,21 @@ func _cross_s(k: int) -> float:
 
 func register(park: Object) -> void:
 	var hw := RAMP_W
-	# Atajos 1 y 2: kicker al borde este del tramo y recepción al borde oeste del siguiente.
+	# Atajos 1 y 2: al principio de la curva k (por el sur la primera, por el norte la
+	# segunda), kicker al borde este del tramo y recepción al borde oeste del siguiente,
+	# pegados a donde empieza y acaba la curva.
 	for k in 2:
-		var h0 := height_at_s(_cross_s(k))
-		var h1 := height_at_s(_cross_s(k + 1))
-		park.shapes.append({"type": "bank", "o": Vector2(_leg_x[k] + RH, SHORT_Z), "dir": Vector2(1, 0),
+		var zc := (LEG_Z - hw * 0.5) * (1.0 if k % 2 == 0 else -1.0)
+		var h0 := height_at_s(_cross_s(k, zc))
+		var h1 := height_at_s(_cross_s(k + 1, zc))
+		park.shapes.append({"type": "bank", "o": Vector2(_leg_x[k] + RH, zc), "dir": Vector2(1, 0),
 			"w": hw, "h": 1.0, "l": 2.5, "len": 2.5, "side": Skatepark.C_WOOD_SIDE, "y0": h0,
 			"k": KICKER_KICK, "skirt": 3.0})
-		park.shapes.append({"type": "bank", "o": Vector2(_leg_x[k + 1] - RH, SHORT_Z), "dir": Vector2(-1, 0),
+		park.shapes.append({"type": "bank", "o": Vector2(_leg_x[k + 1] - RH, zc), "dir": Vector2(-1, 0),
 			"w": hw, "h": 1.3, "l": 4.0, "len": 4.4, "side": Skatepark.C_WOOD_SIDE, "y0": h1,
 			"k": Skatepark.BANK_KICK, "skirt": 3.0})
 	# Atajo 3: puente sobre el tramo 3 hasta el roll-in.
-	var h2 := height_at_s(_cross_s(2))
+	var h2 := height_at_s(_cross_s(2, SHORT_Z))
 	var deck_h: float = _deck["h"]
 	var d0: float = _deck["x0"]
 	var d1: float = _deck["x1"]

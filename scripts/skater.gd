@@ -177,6 +177,8 @@ var _safe_yaw := 0.0
 var _safe_t := 0.0
 var _braking := false
 var _brake_k := 0.0
+## Lado del derrape (+1 / -1; 0 = sin derrapar).
+var _slide_dir := 0.0
 var _prev_tail := Vector3.ZERO
 ## Fuerza del pop del truco en curso (0..1): más altura vale más puntos.
 var _pop_power := 1.0
@@ -250,6 +252,7 @@ func reset_skater(pos := Vector3.ZERO, yaw := 0.0) -> void:
 	_safe_yaw = yaw
 	_braking = false
 	_brake_k = 0.0
+	_slide_dir = 0.0
 	speed = 0.0
 	vel = Vector3.ZERO
 	state = State.RIDING
@@ -392,22 +395,31 @@ func _ride(delta: float, move: Vector2) -> void:
 	# sin parar; también W mantenida y A en el mando.
 	# Freno (FSA-206): S en el teclado, X en el mando o llevar el stick izquierdo (táctil o
 	# del mando) hacia abajo.
-	# Levanta el morro y arrastra el tail (se oye y deja marca).
-	_braking = _kb_brake() or (input_enabled and touch != null and touch.left_vector.y > 0.55) 		or (input_enabled and _pad_stick(JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y).y > 0.55)
+	# Derrape (powerslide): la pierna de atrás cruza la tabla hasta dejarla perpendicular
+	# a la marcha, frena (se oye y deja marca) y al soltar vuelve a ponerla recta.
+	var pad_down := _pad_stick(JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y).y > 0.55
+	_braking = _kb_brake() or (input_enabled and ((touch != null and touch.left_vector.y > 0.55) or pad_down))
 	if input_enabled and touch and not _braking and (touch.left_held() or touch.left_vector.y < -0.5):
 		_push_queued = true
 	if _braking:
 		_push_phase = -1.0
 		_push_queued = false
-		speed = move_toward(speed, 0.0, brake_decel * delta)
-		if skid_marks and speed > 1.0:
-			var tail := position - _forward(heading) * 0.36
+		if _slide_dir == 0.0 and _revert_t < 0.0:
+			# Hacia el lado al que se gira (por defecto, frontside)
+			_slide_dir = -1.0 if _steer > 0.2 else 1.0
+			_offset_target = _slide_dir * PI * 0.5
+		# Frena de verdad cuando la tabla ya está cruzada
+		var slide_k := clampf(absf(_yaw_offset) / (PI * 0.5), 0.0, 1.0)
+		speed = move_toward(speed, 0.0, brake_decel * (0.2 + 0.8 * slide_k) * delta)
+		if skid_marks and speed > 1.0 and slide_k > 0.6:
+			var tail := position - _forward(heading + _yaw_offset) * 0.36
 			tail.y = park.height_at(tail.x, tail.z)
 			if _prev_tail != Vector3.ZERO:
 				skid_marks.add_mark(_prev_tail, tail, _ground_n, 0.05, clampf(speed / 7.0, 0.2, 0.7))
 			_prev_tail = tail
 	else:
 		_prev_tail = Vector3.ZERO
+		_end_slide()
 	_brake_k = move_toward(_brake_k, 1.0 if _braking else 0.0, delta * 6.0)
 	_remember_safe_spot(delta)
 
@@ -467,6 +479,13 @@ func _ride(delta: float, move: Vector2) -> void:
 		_check_vert()
 		return
 	position = Vector3(position.x + disp.x, ns.x, position.z + disp.z)
+
+
+## Fin del derrape: la tabla vuelve a ponerse recta.
+func _end_slide() -> void:
+	if _slide_dir != 0.0:
+		_slide_dir = 0.0
+		_offset_target = 0.0
 
 
 func _hit_wall(s: Vector3, disp: Vector3) -> void:
@@ -708,6 +727,7 @@ func _trick_points() -> int:
 func _enter_air(v: Vector3) -> void:
 	state = State.AIR
 	_arriving = false
+	_end_slide()
 	_revert_t = -1.0
 	vel = v
 	_air_t = 0.0
@@ -1154,7 +1174,7 @@ func _read_move() -> Vector2:
 	return v
 
 
-## Freno: X en el mando o S en el teclado.
+## Derrape: X en el mando o S en el teclado.
 func _kb_brake() -> bool:
 	return input_enabled and (Input.is_physical_key_pressed(KEY_S) or _pad_button(JOY_BUTTON_X))
 
